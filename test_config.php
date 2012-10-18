@@ -19,7 +19,10 @@
  * http://craftsmancoding.com/
  */
 
-// Full path to the dir where the core lives.
+//------------------------------------------------------------------------------
+// CONFIG
+//------------------------------------------------------------------------------
+// Path to the dir where the core lives, ends in trailing slash, e.g. '../' or '/home/user/core/'
 // Leave blank if this script and the core are in the docroot.
 $path_to_core = '';
 
@@ -46,25 +49,6 @@ function print_success() {
 	</div>';
 }
 
-//------------------------------------------------------------------------------
-/* 
-if (!isset($_GET['modx_test']) {
-
-	$_GET['modx_test'] = 'root';
-}
-elseif ($_GET['modx_test'] == 'root') {
-	$_GET['modx_test'] = 'manager';
-}
-elseif($_GET['modx_test'] == 'manager' {
-	$_GET['modx_test'] = 'connectors';
-}
-elseif($_GET['modx_test'] == 'connectors' {
-
-	unset($_GET['modx_test']);
-	// print summary
-}
-*/
-
 if (!file_exists($path_to_docroot.'core/config/config.inc.php')) {
 	$errors[] = 'Incorrect path to core!';
 }
@@ -74,15 +58,8 @@ if (!empty($errors)) {
 	exit;
 }
 
-// set session
-//
-//require_once($path_to_docroot.'index.php');
 require_once($path_to_docroot.'core/config/config.inc.php');
 
-//------------------------------------------------------------------------------
-// Do not edit below this line.
-//------------------------------------------------------------------------------
-// collect the errors
 $errors = array();
 
 // Test $database_dsn.  
