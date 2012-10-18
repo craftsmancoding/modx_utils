@@ -22,7 +22,8 @@
 //------------------------------------------------------------------------------
 // CONFIG
 //------------------------------------------------------------------------------
-// Path to the dir where the core lives, ends in trailing slash, e.g. '../' or '/home/user/core/'
+// Path to the dir containing the core, ends in trailing slash, e.g. '../' 
+// or '/home/user/public_html/'
 // Leave blank if this script and the core are in the docroot.
 $path_to_core = '';
 
