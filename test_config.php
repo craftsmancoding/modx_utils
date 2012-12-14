@@ -11,7 +11,7 @@
  *	alongside the MODX index.php file.
  * 3. Run the script, e.g. by visiting it in a browser: http://yoursite.com/test_config.php
  *	and use any reported error messages to help you clean up your site's configuration.
- * 4. After you verify that the new user has been created, delete this script from the site.
+ * 4. After you have cleaned up any configuration errors, delete this script from the site.
  *
  *
  * AUTHOR:
