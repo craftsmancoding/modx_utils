@@ -6,9 +6,9 @@
  * when installing or moving a site.
  * 
  * USAGE:
- * 1. Upload this script to the Revo website, e.g. to the docroot.
+ * 1. Upload this script to the Revo website, e.g. to the web root.
  * 2. Edit the $path_to_core if you put this script somewhere other than 
- *	alongside the MODX index.php file.
+ *	alongside the MODX index.php file or if you've customized the name of your core dir.
  * 3. Run the script, e.g. by visiting it in a browser: http://yoursite.com/test_config.php
  *	and use any reported error messages to help you clean up your site's configuration.
  * 4. After you have cleaned up any configuration errors, delete this script from the site.
@@ -17,15 +17,19 @@
  * AUTHOR:
  * Everett Griffiths (everett@craftsmancoding.com)
  * http://craftsmancoding.com/
+ *
+ * LAST UPDATED: 
+ * 2013-03-10 MODX 2.2.6
  */
 
 //------------------------------------------------------------------------------
 // CONFIG
 //------------------------------------------------------------------------------
-// Path to the dir containing the core, ends in trailing slash, e.g. '../' 
-// or '/home/user/public_html/'
-// Leave blank if this script and the core are in the docroot.
-$path_to_core = '';
+// Path from this script's location to the MODX core, ends in trailing slash, 
+// e.g. '../core/' or '/home/user/public_html/core/'
+// Leave as 'core/' if this script is in the web root and you don't have a custom
+// directory name for core.
+$path_to_core = 'core/';
 
 //------------------------------------------------------------------------------
 // DO NOT EDIT BELOW THIS LINE
@@ -50,7 +54,7 @@ function print_success() {
 	</div>';
 }
 
-if (!file_exists($path_to_docroot.'core/config/config.inc.php')) {
+if (!file_exists($path_to_core.'config/config.inc.php')) {
 	$errors[] = 'Incorrect path to core!';
 }
 
@@ -59,7 +63,7 @@ if (!empty($errors)) {
 	exit;
 }
 
-require_once($path_to_docroot.'core/config/config.inc.php');
+require_once($path_to_core.'config/config.inc.php');
 
 $errors = array();
 
@@ -109,6 +113,13 @@ if(!defined('MODX_CACHE_DISABLED')) {
 
 // Stage 1
 if (!empty($errors)) {
+	print_errors($errors);
+	exit;
+}
+
+// Check before we require
+if (!file_exists(MODX_CORE_PATH . 'model/modx/modx.class.php')) {
+	$errors[] = 'modX class not found! The modX class file should be located at '.MODX_CORE_PATH . 'model/modx/modx.class.php';
 	print_errors($errors);
 	exit;
 }
