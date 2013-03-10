@@ -54,6 +54,21 @@ function print_success() {
 	</div>';
 }
 
+// Is this really the CORE_PATH?
+// @return boolean true on sucess
+function test_core($path) {
+    //global $errors;
+    // Should be folders for: cache, components, config, docs, error, export, import, lexicon, model, packages, xpdo
+    $folders = array('cache', 'components', 'config', 'docs', 'error', 'export', 'import', 'lexicon', 'model', 'packages', 'xpdo');
+    foreach ($folders as $f) {
+    	if(!file_exists($path.$f)) {
+    		//$errors[] = $path.$f.' folder does not exist!';
+    		return false;
+    	}
+    }
+    return true;
+}
+
 if (!file_exists($path_to_core.'config/config.inc.php')) {
 	$errors[] = 'Incorrect path to core!';
 }
@@ -138,13 +153,17 @@ if (!class_exists('modX')) {
 // Test MODX_CORE_PATH
 // Is this really the CORE_PATH?
 // Should be folders for: cache, components, config, docs, error, export, import, lexicon, model, packages, xpdo
+/*
 $folders = array('cache', 'components', 'config', 'docs', 'error', 'export', 'import', 'lexicon', 'model', 'packages', 'xpdo');
 foreach ($folders as $f) {
 	if(!file_exists(MODX_CORE_PATH.$f)) {
 		$errors[] = MODX_CORE_PATH.$f.' folder does not exist!';
 	}
 }
-
+*/
+if (!test_core(MODX_CORE_PATH)) {
+	$errors[] = 'Your core/config/config.inc.php file has defined an incorrect <code>MODX_CORE_PATH</code>';
+}
 
 // Test MODX_PROCESSORS_PATH
 // Should be folders for 'browser', 'context', 'element', 'resource', 'security', 'source', 'system', 'workspace'
@@ -193,14 +212,55 @@ if (!file_exists(MODX_CONNECTORS_PATH.'config.core.php')) {
 	$errors[] = 'Missing configuration file at '.MODX_CONNECTORS_PATH.'config.core.php';
 }
 
-$root_conf = file_get_contents(MODX_BASE_PATH.'config.core.php');
-$mgr_conf = file_get_contents(MODX_MANAGER_PATH.'config.core.php');
-$conn_conf = file_get_contents(MODX_CONNECTORS_PATH.'config.core.php'); 
+$config_files = array();
+$config_files[] = array(
+    'file' => MODX_BASE_PATH.'config.core.php',
+    'contents' => file_get_contents(MODX_BASE_PATH.'config.core.php')
+);
+$config_files[] = array(
+    'file' => MODX_MANAGER_PATH.'config.core.php',
+    'contents' => file_get_contents(MODX_MANAGER_PATH.'config.core.php')
+);
+$config_files[] = array(
+    'file' => MODX_CONNECTORS_PATH.'config.core.php',
+    'contents' => file_get_contents(MODX_CONNECTORS_PATH.'config.core.php')
+);
 
-if ($root_conf != $mgr_conf || $root_conf != $conn_conf || $mgr_conf != $conn_conf) {
-	$errors[] = 'The contents of your config.core.php files do not match.';
+
+// Config files should define a path in one of the following ways:
+// define('MODX_CORE_PATH', dirname(__FILE__) . '/core/');
+// define('MODX_CORE_PATH', dirname(dirname(__FILE__)) . '/core/');
+// define('MODX_CORE_PATH', '/path/to/core/');
+foreach ($config_files as $c) {
+    
+    preg_match('#'. preg_quote("define('MODX_CORE_PATH',") .'(.*)\);#', $c['contents'], $matches);
+
+    if (isset($matches[1])) {
+
+        $path = trim($matches[1]);
+        $path = preg_replace("/^'/", '', $path);
+        $path = preg_replace("/'$/", '', $path);
+        $path = preg_replace('/^"/', '', $path);
+        $path = preg_replace('/"$/', '', $path);
+        $path = preg_replace('/\s/', '', $path);
+        // does this file use dirname(__FILE__)?
+        if (preg_match('#'.preg_quote('dirname(dirname(__FILE__))').'#',$path)) {
+            $path = preg_replace('#'.preg_quote("dirname(dirname(__FILE__)).'",'/').'#', dirname(dirname($c['file'])), $path);
+        }
+        elseif (preg_match('#'.preg_quote('dirname(__FILE__)').'#',$path)) {
+            $path = preg_replace('#'.preg_quote("dirname(__FILE__).'",'/').'#', dirname($c['file']), $path);
+        }
+
+        if (!test_core($path)) {
+			$errors[] = 'Your '.$c['file'].' file has defined an incorrect <code>MODX_CORE_PATH</code>';
+		}
+    }
+    else {
+        $errors[] = $c['file'] . ' did not define the <code>MODX_CORE_PATH</code> constant!';
+    }
 }
 
+// Test to make sure these files are pointing to the correct spot
 $modx = new modx();
 
 if (!is_object($modx)) {
