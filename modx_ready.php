@@ -23,7 +23,7 @@
 // DO NOT EDIT BELOW THIS LINE
 //------------------------------------------------------------------------------
 $req_min_php_version = '5.1.2';
-$req_ext = array('zlib','json','gd','PDO','pdo_mysql','curl','SimpleXML');
+$req_ext = array('zlib','json','gd','PDO','pdo_mysql','curl','SimpleXML','mysql');
 
 function print_errors($e) {
 	$error_list = implode('<br/>',$e);
@@ -38,7 +38,7 @@ function print_errors($e) {
 function print_success() {
 	print '<div style="margin:10px; padding:20px; border:1px solid green; background-color:#00CC66; border-radius: 5px; width:500px;">
 		<span style="color:green; font-weight:bold;">Success!</span>
-		<p>Your server seems to have what it takes to run MODX.  This is not guarantee that everything will
+		<p>Your server seems to have what it takes to run MODX.  This does not guarantee that everything will
 		work, but at least your server is not missing anything obvious.</p>
 	</div>';
 }
