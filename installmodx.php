@@ -9,8 +9,16 @@
  * WARNING: this script may fail if there is poor network connectivity or if the 
  * MODX site is unavailable.
  * 
- * USAGE (command line):
- * php installmodx.php
+ * PARAMETERS
+ *	--config specifies an XML configuration file to use (rather than prompting the user)
+ *	--zip specifies a local MODX zip file  (rather than downloading it fresh)
+ *	--target specifies a new path to extract the zip file to (e.g. /home/user/public_html/) 
+ *			Default is based on the name of the MODX version and the current working dir.
+ *
+ * USAGE:
+ * 		php installmodx.php
+ * 		php installmodx.php --config=myconfig.php
+ * 		php installmodx.php --zip=modx-2.2.5-pl.zip
  *
  * AUTHOR:
  * Everett Griffiths (everett@craftsmancoding.com)
@@ -41,18 +49,46 @@ define('THIS_AUTHOR', 'Everett Griffiths (everett@craftsmancoding.com)');
 //! Functions
 //------------------------------------------------------------------------------
 /**
+ * Our quitting function...
+ */
+function abort($msg) {
+	print PHP_EOL.'FATAL ERROR! '.$msg . PHP_EOL;
+	print 'Aborting.'. PHP_EOL.PHP_EOL;
+	exit;
+}
+
+/**
+ * Strip the front off the dir name to make for cleaner zipfile extraction.
+ * Converts something like myzipdir/path/to/file.txt
+ * to path/to/file.txt
+ *
+ * Yes, this is some childish tricks here using string reversal, but we 
+ * get the biggest bang for our buck using dirname().
+ * @param string $path
+ * @return string 
+ */
+function strip_first_dir($path) {
+	$path = strrev($path);
+	$path = dirname($path);
+	$path = strrev($path);
+	return $path;
+}
+
+/**
  * Performs checks prior to running the script.
  *
  */
 function preflight() {
+	error_reporting(E_ALL);
 	// Test PHP version.
 	if (version_compare(phpversion(),PHP_REQ_VER,'<')) { 
-		printf("Sorry, this script requires PHP version %s or greater to run.".PHP_EOL, PHP_REQ_VER);
-		exit;
+		abort(sprintf("Sorry, this script requires PHP version %s or greater to run.", PHP_REQ_VER));
 	}
 	if (!extension_loaded('curl')) {
-		print "Sorry, this script requires the curl extension for PHP.".PHP_EOL;
-		exit;
+		abort("Sorry, this script requires the curl extension for PHP.");
+	}
+	if (!class_exists('ZipArchive')) {
+		abort("Sorry, this script requires the ZipArchive classes for PHP.");
 	}
 }
 
@@ -85,6 +121,44 @@ function print_banner() {
 	print str_repeat(PHP_EOL,5);
 }
 
+/**
+ * Get and vet command line arguments
+ * @return array
+ */
+function get_args() {
+	$shortopts  = '';
+	$shortopts .= 'c::'; // Optional value
+	$shortopts .= 'z::'; // Optional value
+	$shortopts .= 't::'; // Optional value
+	
+	$longopts  = array(
+	    'config::',    // Optional value
+	    'zip::',    // Optional value
+	    'target::',    // Optional value
+	);
+	$opts = getopt($shortopts, $longopts);
+	
+	if (isset($opts['config']) && !file_exists($opts['config'])) {
+		abort('Configuration file not found. ' . $opts['config']);
+	}
+	else {
+		$opts['config'] = false;
+	}
+	if (isset($opts['zip']) && !file_exists($opts['zip'])) {
+		abort('Zip file not found. ' . $opts['zip']);
+	}
+	if (isset($opts['target'])) {
+		if (file_exists($opts['target'])) {
+			abort('The target directory cannot already exist: '.$opts['target']);
+		}
+	}
+	else {
+		$opts['target'] = null;
+	}
+
+	return $opts;
+}
+
 /** 
  * Finds the name of the lastest stable version of MODX
  * by scraping the MODX website.  Prints some messaging...
@@ -96,8 +170,7 @@ function get_latest_modx_version() {
 	$contents = file_get_contents(INFO_PAGE);
 	preg_match('#'.preg_quote('<h3>MODX Revolution ').'(.*)'. preg_quote('</h3>','/').'#msU',$contents,$m1);
 	if (!isset($m1[1])) {
-	    print 'FATAL ERROR: Version could not be detected on '. INFO_PAGE .PHP_EOL;
-	    exit;
+	    abort('Version could not be detected on '. INFO_PAGE);
 	}
 	print $m1[1] . PHP_EOL;
 	return $m1[1];
@@ -123,6 +196,7 @@ function download_modx($modx_zip) {
 	$zip_url = DOWNLOAD_PAGE.$modx_zip;
 	$local_file = $modx_zip; // TODO: different location?
 	print "Downloading $zip_url".PHP_EOL;
+	printf( "%c[2J", ESC ); //clear screen
 	
 	$fp = fopen($local_file, 'w');
 	$ch = curl_init();
@@ -133,16 +207,123 @@ function download_modx($modx_zip) {
 	curl_setopt($ch, CURLOPT_PROGRESSFUNCTION, 'progress_indicator');
 	curl_setopt($ch, CURLOPT_BUFFERSIZE, 128); // bigger = fewer callbacks
 	if (curl_exec($ch) === false) {
-		print "FATAL ERROR: There was a problem downloading the zip file: " .curl_error($ch);
-		exit;
+		abort("There was a problem downloading the zip file: " .curl_error($ch));
 	}
 	else {
+		print PHP_EOL;
 		print "Zip file downloaded to $local_file".PHP_EOL;
 	}
 	curl_close($ch);
 	fclose($fp);	
 }
- 
+
+
+/**
+ * Extract the zip file.
+ *
+ * @param string $zipfile (relative to this script, e.g. myfile.zip)
+ * @param string $extractto path where we want to extrat to
+ */
+/*
+function extract_zip($zipfile,$extractto) {
+	print "Extracting to $extractto". PHP_EOL;
+	$zip = new ZipArchive;
+	if ($zip->open($zipfile) === true) {
+
+		//$zip->extractTo($extractto); // This did not work -- if there is a single error, it borks.
+		// The "." file generates a warning (wtf?)
+		// So we go through item by item.
+		for($i = 0; $i < $zip->numFiles; $i++) {
+			
+//			// This works, but you always end up having a parent $extractto dir
+//	        if(!@$zip->extractTo($extractto, array($zip->getNameIndex($i)))) {
+//	        	print 'Could not extract file '.$zip->getNameIndex($i).PHP_EOL;
+//	        }
+//	        else {
+//	        	print $zip->getNameIndex($i).PHP_EOL;
+//	        }
+//
+	        $filename = $zip->getNameIndex($i);
+
+			print $filename . PHP_EOL;			
+//			copy("zip://".$zipfile."#".$filename, $extractto.'x.txt');
+        	$dir = pathinfo($filename,PATHINFO_DIRNAME);
+        	if (!file_exists($dir)) {
+        		print 'Creating dir '.$dir .PHP_EOL;
+        		@mkdir($dir,0777,true);
+        	}
+//        	print "zip://".$zipfile."#".$filename.', '. $extractto.$filename . PHP_EOL;
+        	copy("zip://".$zipfile."#".$filename, $extractto.$filename);
+	                    
+	    }
+
+
+		$zip->close();
+		print "Extracted zip file $zipfile to $extractto".PHP_EOL;
+	} 
+	else {
+		abort('Could not open zip file' . $zipfile);
+	}
+}
+*/
+/**
+ * The trick is to shift the "modx-2.2.6-pl" off from the front of the 
+ * extraction. Instead of extracting to public_html/modx-2.2.6-pl/ we want
+ * to extract straight to public_html/
+ *
+ * See http://stackoverflow.com/questions/5256551/unzip-the-file-using-php-collapses-the-zip-file-into-one-folder
+ */
+function extract_zip($zipfile,$extractto) {
+	
+	$extractto = basename($extractto).DIRECTORY_SEPARATOR; // make sure we have a trailing slash.
+	
+	$z = zip_open($zipfile) or die("can't open $zipfile: $php_errormsg");
+	while ($entry = zip_read($z)) {
+		
+		$entry_name = zip_entry_name($entry);
+
+		// only proceed if the file is not 0 bytes long
+		if (zip_entry_filesize($entry)) {
+			// Put this in our own directory
+			$entry_name = $extractto . strip_first_dir($entry_name);
+			print 'inflating: '. $entry_name .PHP_EOL;
+			$dir = dirname($entry_name);
+			// make all necessary directories in the file's path
+			if (!is_dir($dir)) { 
+				@mkdir($dir,0777,true); 
+			}
+				
+			$file = basename($entry_name);
+			
+			if (zip_entry_open($z,$entry)) {
+				if ($fh = fopen($dir.'/'.$file,'w')) {
+					// write the entire file
+					fwrite($fh,
+					zip_entry_read($entry,zip_entry_filesize($entry)))
+					or error_log("can't write: $php_errormsg");
+					fclose($fh) or error_log("can't close: $php_errormsg");
+				} 
+				else {
+					error_log("can't open $dir/$file: $php_errormsg");
+				}
+				zip_entry_close($entry);
+			} 
+			else {
+				error_log("can't open entry $entry_name: $php_errormsg");
+			}
+		}
+	}
+}
+
+/**
+ * Check to ensure the directory we think contains MODX actually
+ * does appear to contain MODX
+ * @param string $dir directory containing MODX.
+ */
+function verify_modx_dir($dir) {
+
+}
+
 //------------------------------------------------------------------------------
 //! Vars
 //------------------------------------------------------------------------------
@@ -157,34 +338,50 @@ $i = 0; // for spinner iterations
 preflight();
 // Some eye-candy...
 print_banner();
-// get the latest MODX version (scrape the info page)
-$modx_version = get_latest_modx_version();
-$modx_zip = 'modx-'.$modx_version.'.zip';
 
-// If we already have the file downloaded, can we use the existing zip?
-if (file_exists($modx_zip)) { 
-	print $modx_zip .' detected locally on the filesystem.'.PHP_EOL;
-	print 'Would you like to use that zip file? [y/n]';
-	$yn = fgets(STDIN);
-	if (strtolower(trim($yn)) == 'n') {
-		download_modx($modx_version);
-	}
+// Read and validate any command-line arguments
+$args = get_args();
+
+// Skip downloading if we've already got a zip file
+if ($args['zip']) {
+	print 'Using existing zip file: '.$args['zip'] . PHP_EOL;
 }
 else {
-	download_modx($modx_version);
+	// get the latest MODX version (scrape the info page)
+	$modx_version = get_latest_modx_version();
+	$modx_zip = 'modx-'.$modx_version.'.zip';
+	
+	// If we already have the file downloaded, can we use the existing zip?
+	if (file_exists($modx_zip)) { 
+		print $modx_zip .' was detected locally on the filesystem.'.PHP_EOL;
+		print 'Would you like to use that zip file? [y/n] > ';
+		$yn = fgets(STDIN);
+		if (strtolower(trim($yn)) == 'n') {
+			download_modx($modx_zip);
+		}
+	}
+	else {
+		download_modx($modx_zip);
+	}
+	// At this point, behavior is as if we had specified the zip file verbosely.
+	$args['zip'] = $modx_zip;
 }
 
-
-/*
-$zip = new ZipArchive;
-if ($zip->open('test.zip') === TRUE) {
-  $zip->extractTo('/my/destination/dir/');
-  $zip->close();
-  echo 'ok';
-} else {
-  echo 'failed';
+// Prompt the user for target
+if (!$args['target']) {
+//	$extractto = getcwd().DIRECTORY_SEPARATOR.pathinfo($args['zip'],PATHINFO_FILENAME)
+//		.DIRECTORY_SEPARATOR;
+	$extractto = pathinfo($args['zip'],PATHINFO_FILENAME).DIRECTORY_SEPARATOR;
+//	$extractto = getcwd().DIRECTORY_SEPARATOR;
+	print "Where should this be unzipped to? ($extractto) > ";
+	$extractto_path = fgets(STDIN);
+	$extractto_path = trim($extractto_path);
+	if (!empty($extractto_path)) {
+		$extractto = $extractto_path;
+	}
 }
-*/
+$zip = getcwd() . DIRECTORY_SEPARATOR.$args['zip'];
+extract_zip($args['zip'],$extractto);
 
 // Test Database Connection
 
