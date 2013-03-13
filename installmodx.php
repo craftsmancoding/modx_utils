@@ -10,10 +10,10 @@
  * MODX site is unavailable.
  * 
  * PARAMETERS
- *	--config specifies an XML configuration file to use (rather than prompting the user)
- *	--zip specifies a local MODX zip file  (rather than downloading it fresh)
- *	--target specifies a new path to extract the zip file to (e.g. /home/user/public_html/) 
- *			Default is based on the name of the MODX version and the current working dir.
+ *	--config specifies an XML configuration file to use (path is relative to PWD)
+ *	--zip specifies a local MODX zip file  (path is relative to PWD)
+ *	--target specifies where to extract the zip file, e.g. public_html/ 
+ *			(path is relative to PWD).
  *
  * USAGE:
  * 		php installmodx.php
@@ -44,7 +44,7 @@ define('ESC', 27);
 define('PHP_REQ_VER', '5.3.0');
 define('THIS_VERSION', '1.0');
 define('THIS_AUTHOR', 'Everett Griffiths (everett@craftsmancoding.com)');
-
+define('DIR_PERMS', 0777); // for cache, etc.
 //------------------------------------------------------------------------------
 //! Functions
 //------------------------------------------------------------------------------
@@ -144,6 +144,10 @@ function preflight() {
 	if (!class_exists('ZipArchive')) {
 		abort("Sorry, this script requires the ZipArchive classes for PHP.");
 	}
+	// timezone
+	if (!ini_get('date.timezone')) {
+		abort("You must set the date.timezone setting in your php.ini. Please set it to a proper timezone before proceeding.");
+	}
 }
 
 /** 
@@ -165,15 +169,16 @@ function print_banner() {
 | '--------------' || '--------------' || '--------------' || '--------------' |
  '----------------'  '----------------'  '----------------'  '----------------
 
-            ,--.                ,--.          ,--.,--.               
-            |  |,--,--,  ,---.,-'  '-. ,--,--.|  ||  | ,---. ,--.--. 
-            |  ||      \(  .-''-.  .-'' ,-.  ||  ||  || .-. :|  .--' 
-            |  ||  ||  |.-'  `) |  |  \ '-'  ||  ||  |\   --.|  |    
-            `--'`--''--'`----'  `--'   `--`--'`--'`--' `----'`--'    
-                                                         
+           ,--.                ,--.          ,--.,--.               
+           |  |,--,--,  ,---.,-'  '-. ,--,--.|  ||  | ,---. ,--.--. 
+           |  ||      \(  .-''-.  .-'' ,-.  ||  ||  || .-. :|  .--' 
+           |  ||  ||  |.-'  `) |  |  \ '-'  ||  ||  |\   --.|  |    
+           `--'`--''--'`----'  `--'   `--`--'`--'`--' `----'`--'    
+
+                                                       
 ";
 	print 'Version '.THIS_VERSION . str_repeat(' ', 15).'by '. THIS_AUTHOR . PHP_EOL;
-	print str_repeat(PHP_EOL,5);
+	print str_repeat(PHP_EOL,2);
 }
 
 /**
@@ -240,8 +245,9 @@ function get_latest_modx_version() {
 function progress_indicator($ch,$str) {
 	global $cursorArray;
 	global $i;
+	global $zip_url;
 	//restore cursor position and print
-	printf("%c8Downloading... (".$cursorArray[ (($i++ > 7) ? ($i = 1) : ($i % 8)) ].")", ESC); 
+	printf("%c8Downloading $zip_url... (".$cursorArray[ (($i++ > 7) ? ($i = 1) : ($i % 8)) ].")", ESC); 
 }
 
 /**
@@ -250,6 +256,7 @@ function progress_indicator($ch,$str) {
  * @param string $modx_version e.g. modx-2.2.6-pl.zip
  */
 function download_modx($modx_zip) {
+	global $zip_url;
 	$zip_url = DOWNLOAD_PAGE.$modx_zip;
 	$local_file = $modx_zip; // TODO: different location?
 	print "Downloading $zip_url".PHP_EOL;
@@ -463,6 +470,55 @@ function write_xml($contents,$xml_path) {
 	}
 }
 
+/**
+ * Set up a few things in MODX...
+ *
+ * @param string $target
+ */
+function prepare_modx($target) {
+	$base_path = getcwd().DIRECTORY_SEPARATOR.$target;
+	$core_path = $base_path . 'core/';
+	// Check that core/cache/ exists and is writeable
+	if (!file_exists($core_path.'cache')) {
+		@mkdir($core_path.'cache',0777,true); 
+	}
+	if (!is_writable($core_path.'cache')) {
+		chmod($core_path.'cache', DIR_PERMS);
+	}
+	
+	// Check that core/components/ exists and is writeable
+	if (!file_exists($core_path.'components')) {
+		@mkdir($core_path.'components',0777,true); 
+	}
+	if (!is_writable($core_path.'components')) {
+		chmod($core_path.'components', DIR_PERMS);
+	}
+	
+	// Check that assets/components/ exists and is writeable
+	if (!file_exists($base_path.'assets/components')) {
+		@mkdir($base_path.'assets/components',0777,true); 
+	}
+	if (!is_writable($base_path.'assets/components')) {
+		chmod($base_path.'assets/components', DIR_PERMS);
+	}
+
+	// Check that core/export/ exists and is writable
+	if (!file_exists($core_path.'export')) {
+		@mkdir($core_path.'export',0777,true); 
+	}
+	if (!is_writable($core_path.'export')) {
+		chmod($core_path.'export', DIR_PERMS);
+	}
+	
+	// touch the config file
+	if (!file_exists($core_path.'config/config.inc.php')) {
+		@mkdir($core_path.'config',0777,true); 
+		touch($core_path.'config/config.inc.php');
+	}
+	if (!is_writable($core_path.'config/config.inc.php')) {
+		chmod($core_path.'config/config.inc.php', DIR_PERMS);
+	}
+}
 
 //------------------------------------------------------------------------------
 //! Vars
@@ -470,11 +526,13 @@ function write_xml($contents,$xml_path) {
 // Each spot in the array is a "frame" in our spinner animation
 $cursorArray = array('/','-','\\','|','/','-','\\','|'); 
 $i = 0; // for spinner iterations
+// declared here so we can use it in the progress indicator.
+$zip_url = '';
 
 //------------------------------------------------------------------------------
 //! MAIN
 //------------------------------------------------------------------------------
-// preflight: php version, is cli?, can we write to the local dir?, etc...
+// check php version, is cli?, can we write to the local dir?, etc...
 preflight();
 
 // Read and validate any command-line arguments
@@ -483,10 +541,20 @@ $args = get_args();
 // Some eye-candy...
 print_banner();
 
-
+// Last chance to bail...
+print 'This script installs the MODX Content Management System (http://modx.com/)'.PHP_EOL;
+print 'You need a dedicated database with a username/password handy and your user'.PHP_EOL;
+print 'must have the proper write permissions for this script to work properly.'.PHP_EOL.PHP_EOL;
+print 'Are you ready to continue? (y/n) [n] > ';
+$yn = strtolower(trim(fgets(STDIN)));
+if ($yn!='y') {
+	print 'Catch you next time.' .PHP_EOL.PHP_EOL;
+	exit;
+}
+print PHP_EOL;
 
 // Skip downloading if we've already got a zip file
-if ($args['zip']) {
+if (isset($args['zip']) && !empty($args['zip'])) {
 	print 'Using existing zip file: '.$args['zip'] . PHP_EOL;
 }
 else {
@@ -496,10 +564,10 @@ else {
 	
 	// If we already have the file downloaded, can we use the existing zip?
 	if (file_exists($modx_zip)) { 
-		print $modx_zip .' was detected locally on the filesystem.'.PHP_EOL;
-		print 'Would you like to use that zip file? [y/n] > ';
-		$yn = fgets(STDIN);
-		if (strtolower(trim($yn)) == 'n') {
+		print $modx_zip .' was detected locally on the filesystem.'.PHP_EOL.PHP_EOL;
+		print 'Would you like to use that zip file? (y/n) [y] > ';
+		$yn = strtolower(trim(fgets(STDIN)));
+		if ($yn != 'y') {
 			download_modx($modx_zip);
 		}
 	}
@@ -514,7 +582,7 @@ else {
 if (!$args['target']) {
 	// Default
 	$args['target'] = pathinfo($args['zip'],PATHINFO_FILENAME).DIRECTORY_SEPARATOR;
-	print "Where should this be unzipped to? [$target] > ";
+	print PHP_EOL."Where should this be extracted? [".$args['target']."] > ";
 	$target_path = trim(fgets(STDIN));
 	if (!empty($target_path)) {
 		$args['target'] = $target_path;
@@ -542,17 +610,17 @@ if (!$args['config']) {
 	$data['Database Password'] = '';
 	
 	$data['MODX Admin Username'] = '';
-	$data['MODX Admin Password'] = '';
 	$data['MODX Admin Email'] = '';
+	$data['MODX Admin Password'] = '';
 	
 	ENTERDATA:
 	$data = get_data($data);
 	print_review_data($data);
 	
-	print PHP_EOL. "Is this correct? [y/n] >";
+	print PHP_EOL. "Is this correct? (y/n) [n] >";
 	$yn = strtolower(trim(fgets(STDIN)));
-	if ($yn == 'n') {
-		goto ENTERDATA; // yeah... GOTO mf'er!
+	if ($yn != 'y') {
+		goto ENTERDATA; // yeah... 1980 called and wants their code back.
 	}	
 	
 	// Some defaults here.
@@ -580,7 +648,19 @@ write_xml($xml, $xml_path);
 
 // Test Database Connection?  We can't do this unless the user provided data.
 
-// Run install
-// php ./index.php --installmode=new --config=/path/to/config.xml
+// Check that core/cache exists and is writeable
+prepare_modx($target);
 
+// Run install
+print 'Off we go... installing MODX...'.PHP_EOL.PHP_EOL;
+// Via command line, we'd do this:
+// php setup/index.php --installmode=new --config=/path/to/config.xml
+// but here, we fake it.
+unset($argv);
+$argv[1] = '--installmode=new';
+include($target.'setup/index.php');
+
+print PHP_EOL;
+print 'You may now log into your MODX installation.'.PHP_EOL;
+print 'Thanks for using the MODX installer!'.PHP_EOL.PHP_EOL;
 /*EOF*/
