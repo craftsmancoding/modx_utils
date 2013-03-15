@@ -4,7 +4,8 @@
  * Install MODX via CLI
  *
  * This script downloads latest version of MODX and installs it to the directory you 
- * specify.  The script prompts you for your login details.
+ * specify.  The script prompts you for your login details.  
+ * Currently, this supports only installation to web root (i.e. not to a sub-dir).
  *
  * WARNING: this script may fail if there is poor network connectivity or if the 
  * MODX site is unavailable.
@@ -19,6 +20,8 @@
  * 		php installmodx.php
  * 		php installmodx.php --config=myconfig.php
  * 		php installmodx.php --zip=modx-2.2.5-pl.zip
+ *
+ * See http://youtu.be/-FR10DR16CE for an example video of this in action.
  *
  * AUTHOR:
  * Everett Griffiths (everett@craftsmancoding.com)
