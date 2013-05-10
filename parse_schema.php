@@ -33,6 +33,8 @@ if (!defined('MODX_CORE_PATH')) {
         <p>MODX_CORE_PATH not defined! Did you include the correct config file?</p>');
     exit;
 }
+require_once MODX_CORE_PATH . 'config/config.inc.php';
+
 $xpdo_path = strtr(MODX_CORE_PATH . 'xpdo/xpdo.class.php', '\\', '/');
 include_once ( $xpdo_path );
   
