@@ -1,25 +1,36 @@
 #!/usr/bin/php -q
 <?php
 /**
- * Install MODX via CLI
+ * Install/Upgrade MODX via CLI 
+ *
+ * (requires PHP 5.3.0 or greater)
  *
  * This script downloads latest version of MODX and installs it to the directory you 
- * specify.  The script prompts you for your login details.  
- * Currently, this supports only installation to web root (i.e. not to a sub-dir).
+ * specify.  The script prompts you for your login details.
  *
  * WARNING: this script may fail if there is poor network connectivity or if the 
  * MODX site is unavailable.
  * 
+ * When updating a site (--installmode=upgrade), we have some extra work to do
+ *  Prompt the user to remind them to make a backup!!!
+ *  Create an XML file if they didn't supply a --config option
+ *  Log out all users.
+ *
  * PARAMETERS
  *	--config specifies an XML configuration file to use (path is relative to PWD)
  *	--zip specifies a local MODX zip file  (path is relative to PWD)
- *	--target specifies where to extract the zip file, e.g. public_html/ 
- *			(path is relative to PWD).
+ *	--target specifies where to extract the zip file, e.g. public_html/ (i.e. the base_path).
+ *  --version specifies the version of MODX to install, e.g. 2.2.5-pl. Defaults to
+ *          the latest public release.
+ *  --installmode : 'new' for new installs, 'upgrade' for upgrades. (default:new).
+ *  --core_path : req'd if you are doing an upgrade.
  *
  * USAGE:
  * 		php installmodx.php
  * 		php installmodx.php --config=myconfig.php
- * 		php installmodx.php --zip=modx-2.2.5-pl.zip
+ * 		php installmodx.php --zip=my-local-modx.zip
+ *      php installmodx.php --version=2.2.1-pl
+ *      php installmodx.php --installmode=upgrade --core_path=public_html/core
  *
  * See http://youtu.be/-FR10DR16CE for an example video of this in action.
  *
@@ -43,11 +54,13 @@ define('INFO_PAGE', 'http://modx.com/download/');
 // append the modx version, e.g. modx-2.2.6.zip
 define('DOWNLOAD_PAGE', 'http://modx.com/download/direct/');
 define('ESC', 27);
-// version of PHP this script needs to run.
+// we need PHP 5.3.0 for the CLI options and GOTO statements (yes, really)
 define('PHP_REQ_VER', '5.3.0');
-define('THIS_VERSION', '1.0');
+define('THIS_VERSION', '1.1');
 define('THIS_AUTHOR', 'Everett Griffiths (everett@craftsmancoding.com)');
 define('DIR_PERMS', 0777); // for cache, etc.
+ignore_user_abort(true);
+set_time_limit(0);
 //------------------------------------------------------------------------------
 //! Functions
 //------------------------------------------------------------------------------
@@ -77,7 +90,10 @@ PARAMETERS:
 ----------------------------------------------
 --config : path to an XML file, containing site info. See http://bit.ly/pvVcHw
 --zip : a MODX zip file, downloaded from ".DOWNLOAD_PAGE."
---target : the root of your MODX install, relative to the current dir. E.g. public_html/
+--target : the base_path of your MODX install, can be relative e.g. public_html/
+--version : the version of MODX to install, e.g. 2.2.8-pl. Defaults to latest avail.
+--installmode : 'new' for new installs, 'upgrade' for upgrades. (default:new).
+--core_path : req'd if you are performing an upgrade.
 --help : displays this help page.
 
 ----------------------------------------------
@@ -111,7 +127,6 @@ BUGS and FEATURE SUGGESTIONS
 Please direct feedback about this script to https://github.com/craftsmancoding/modx_utils
 
 ";
-	exit;
 }
 
 /**
@@ -193,19 +208,26 @@ function get_args() {
 	$shortopts .= 'c::'; // Optional value
 	$shortopts .= 'z::'; // Optional value
 	$shortopts .= 't::'; // Optional value
-	$shortopts .= 'h::'; // Optional value
+	$shortopts .= 'v::'; // Optional value
+	$shortopts .= 'i::'; // Optional value	
+	$shortopts .= 'p::'; // Optional value	
+	$shortopts .= 'h';   // Optional value
 	
 	$longopts  = array(
-	    'config::',    // Optional value
-	    'zip::',    // Optional value
-	    'target::',    // Optional value
-	   	'help::',    // Optional value
+	    'config::',        // Optional value
+	    'zip::',           // Optional value
+	    'target::',        // Optional value
+	    'version::',       // Optional value
+	    'installmode::',   // Optional value
+	    'core_path::',     // Optional value
+	   	'help',            // Optional value
 	);
 	
 	$opts = getopt($shortopts, $longopts);
 	
 	if (isset($opts['help'])) {
 		show_help();
+		exit;
 	}
 	
 	if (isset($opts['config']) && !file_exists($opts['config'])) {
@@ -220,6 +242,25 @@ function get_args() {
 	if (!isset($opts['target'])) {
 		$opts['target'] = null;
 	}
+	if (!isset($opts['version'])) {
+	   $opts['version'] = 'latest';
+	}
+	if (!isset($opts['installmode'])) {
+	   $opts['installmode'] = 'new';
+    }
+    elseif (!in_array($opts['installmode'], array('new','upgrade'))) {
+        show_help();
+        abort('Invalid argument for --installmode. It supports "new" or "upgrade"');
+    }
+    elseif($opts['installmode'] != 'new') {
+        if (!isset($opts['core_path'])) {
+            abort('--core_path must be set for upgrades: we need it to locate your existing installation.');
+        }
+        $opts['core_path'] = realpath($opts['core_path']).DIRECTORY_SEPARATOR;
+        if (!file_exists($opts['core_path'] .'config/config.inc.php')) {
+            abort('Invalid --core_path. Could not locate '.$opts['core_path'] .'config/config.inc.php');   
+        }        
+    }
 
 	return $opts;
 }
@@ -256,7 +297,7 @@ function progress_indicator($ch,$str) {
 /**
  *
  * When finished, you should have a modx-x.x.x.zip file locally on your system.
- * @param string $modx_version e.g. modx-2.2.6-pl.zip
+ * @param string $modx_zip e.g. modx-2.2.6-pl.zip (format is "modx-" + version + ".zip")
  */
 function download_modx($modx_zip) {
 	global $zip_url;
@@ -297,7 +338,7 @@ function download_modx($modx_zip) {
  * @param string $target path where we want to setup MODX, e.g. public_html/
  */
 function extract_zip($zipfile,$target) {
-	
+
 	$z = zip_open($zipfile) or die("can't open $zipfile: $php_errormsg");
 	while ($entry = zip_read($z)) {
 		
@@ -345,18 +386,30 @@ function extract_zip($zipfile,$target) {
  */
 function get_data($data) {
 
-	print '-----------------------------------------' . PHP_EOL;
+	print '-------------------------------------------------------------' . PHP_EOL;
 	print 'Provide your configuration details below.'.PHP_EOL;
-	print '(you can review this before you install).'.PHP_EOL;
-	print '-----------------------------------------' . PHP_EOL.PHP_EOL;
+	print 'If you are unsure about a setting, accept the default value.'.PHP_EOL;
+	print '(You can review your choices before you install).'.PHP_EOL;
+	print '-------------------------------------------------------------' . PHP_EOL.PHP_EOL;
+	
+	// Add some descriptive labels to any field that needs extra descriptions
+	$help = array();
+	$help['base_url'] = 'Base URL (change this only if you are installing to a sub-directory)';
+	$data['mgr_url'] = 'Manager URL segment (change to a non-standard location for security)';
+	$data['connectors_url'] = 'Connectors URL segment';	
 	
 	foreach($data as $k => $v) {
 		$default_label = ''; // with [brackets]
 		if (!empty($v)) {
 			$default_label = " [$v]";
 		}
-		print $k . $default_label.': ';
-		
+		if (isset($help[$k])) {
+		  print $help[$k] . $default_label.': ';
+		}
+		else {
+    		print $k . $default_label.': ';
+		}
+			
 		$input = trim(fgets(STDIN));
 		if (!empty($input)) {
 			$data[$k] = $input;
@@ -402,15 +455,15 @@ Created by the modxinstaller.php script.
 https://github.com/craftsmancoding/modx_utils
 -->
 <modx>
-	<database_type>mysql</database_type>
-    <database_server>localhost</database_server>
+	<database_type>'.$data['Database Type'].'</database_type>
+    <database_server>'.$data['Database Server'].'</database_server>
     <database>'.$data['Database Name'].'</database>
     <database_user>'.$data['Database User'].'</database_user>
     <database_password>'.$data['Database Password'].'</database_password>
-    <database_connection_charset>utf8</database_connection_charset>
-    <database_charset>utf8</database_charset>
-    <database_collation>utf8_general_ci</database_collation>
-    <table_prefix>modx_</table_prefix>
+    <database_connection_charset>'.$data['Database Charset'].'</database_connection_charset>
+    <database_charset>'.$data['Database Charset'].'</database_charset>
+    <database_collation>'.$data['Database Collation'].'</database_collation>
+    <table_prefix>'.$data['Table Prefix'].'</table_prefix>
     <https_port>443</https_port>
     <http_host>localhost</http_host>
     <cache_disabled>0</cache_disabled>
@@ -474,13 +527,14 @@ function write_xml($contents,$xml_path) {
 }
 
 /**
- * Set up a few things in MODX...
+ * Some assembly is required after opening the MODX package.
+ * So we set up a few things in MODX for a better experience.
  *
  * @param string $target
  */
-function prepare_modx($target) {
-	$base_path = getcwd().DIRECTORY_SEPARATOR.$target;
-	$core_path = $base_path . 'core/';
+function prepare_modx($data) {
+	$base_path = $data['base_path'];
+	$core_path = $data['core_path'];
 	// Check that core/cache/ exists and is writeable
 	if (!file_exists($core_path.'cache')) {
 		@mkdir($core_path.'cache',0777,true); 
@@ -521,6 +575,9 @@ function prepare_modx($target) {
 	if (!is_writable($core_path.'config/config.inc.php')) {
 		chmod($core_path.'config/config.inc.php', DIR_PERMS);
 	}
+	
+	// Lock down the core: activate core/ht.access
+	@rename($core_path.'ht.access', $core_path.'.htaccess');
 }
 
 //------------------------------------------------------------------------------
@@ -529,7 +586,7 @@ function prepare_modx($target) {
 // Each spot in the array is a "frame" in our spinner animation
 $cursorArray = array('/','-','\\','|','/','-','\\','|'); 
 $i = 0; // for spinner iterations
-// declared here so we can use it in the progress indicator.
+// declared here in the main scope so we can use it in the progress indicator.
 $zip_url = '';
 
 //------------------------------------------------------------------------------
@@ -545,9 +602,10 @@ $args = get_args();
 print_banner();
 
 // Last chance to bail...
-print 'This script installs the MODX Content Management System (http://modx.com/)'.PHP_EOL;
-print 'You need a dedicated database with a username/password handy and your user'.PHP_EOL;
+print 'This script installs or updates the MODX Content Management System (http://modx.com/)'.PHP_EOL;
+print 'You need a dedicated database with a username/password and your user'.PHP_EOL;
 print 'must have the proper write permissions for this script to work properly.'.PHP_EOL.PHP_EOL;
+print 'For upgrades, this script must be placed on the same drive as an existing MODX installation.'.PHP_EOL.PHP_EOL;
 print 'Are you ready to continue? (y/n) [n] > ';
 $yn = strtolower(trim(fgets(STDIN)));
 if ($yn!='y') {
@@ -561,9 +619,10 @@ if (isset($args['zip']) && !empty($args['zip'])) {
 	print 'Using existing zip file: '.$args['zip'] . PHP_EOL;
 }
 else {
-	// get the latest MODX version (scrape the info page)
-	$modx_version = get_latest_modx_version();
-	$modx_zip = 'modx-'.$modx_version.'.zip';
+    if ($args['version'] == 'latest') {
+        $args['version'] = get_latest_modx_version();
+    }
+	$modx_zip = 'modx-'.$args['version'].'.zip';
 	
 	// If we already have the file downloaded, can we use the existing zip?
 	if (file_exists($modx_zip)) { 
@@ -583,7 +642,8 @@ else {
 
 // Prompt the user for target
 if (!$args['target']) {
-	// Default
+	// Default: 
+	// TODO: if upgrade, read MODX_BASE_PATH
 	$args['target'] = pathinfo($args['zip'],PATHINFO_FILENAME).DIRECTORY_SEPARATOR;
 	print PHP_EOL."Where should this be extracted? [".$args['target']."] > ";
 	$target_path = trim(fgets(STDIN));
@@ -593,7 +653,22 @@ if (!$args['target']) {
 }
 
 // make sure we have a trailing slash on the target dir
-$target = basename($args['target']).DIRECTORY_SEPARATOR; 
+//$target = basename($args['target']).DIRECTORY_SEPARATOR; 
+$target = realpath($target).DIRECTORY_SEPARATOR;
+
+// Does the target exist?
+if (file_exists($target)) {
+    if (!is_dir($target)) {
+        abort($target .' must be a directory!');
+    }
+}
+else {
+    @mkdir($target,0777,true);
+}
+// Did we actually get the zip file?
+if (!filesize($args['zip'])) {
+    abort($args['zip'] . ' is an empty file. Did you specify a valid version?');
+}
 
 extract_zip($args['zip'],$target);
 
@@ -602,43 +677,60 @@ extract_zip($args['zip'],$target);
 // Yes, and we even have a GOTO statement.
 $xml_path = $target.'setup/config.xml';
 
-if (!$args['config']) {	
+$data = array();
 
-	$data = array();
-	
+if (!$args['config']) {	
 	// Put anything here that you want to prompt the user about.
-	// Put default values here.
+	// If you include a value, that value will be used as the default.
+	$data['Database Type'] = 'mysql';
+	$data['Database Server'] = 'localhost';
 	$data['Database Name'] = '';
 	$data['Database User'] = '';
 	$data['Database Password'] = '';
+    $data['Database Charset'] = 'utf8';
+	$data['Database Collation'] = 'utf8_general_ci';
+	$data['Table Prefix'] = 'modx_';
+
+	$data['core_path'] = $target.'core/';	
+
+    $data['base_url'] = '/';
+	$data['mgr_url'] = '/manager/';
+	$data['connectors_url'] = '/connectors/';
+	
 	
 	$data['MODX Admin Username'] = '';
 	$data['MODX Admin Email'] = '';
 	$data['MODX Admin Password'] = '';
-	
-	ENTERDATA:
+
+
+	ENTERNEWDATA:
 	$data = get_data($data);
 	print_review_data($data);
 	
 	print PHP_EOL. "Is this correct? (y/n) [n] >";
 	$yn = strtolower(trim(fgets(STDIN)));
 	if ($yn != 'y') {
-		goto ENTERDATA; // yeah... 1980 called and wants their code back.
+		goto ENTERNEWDATA; // yeah... 1980 called and wants their code back.
 	}	
+    // Anything that needs to appear in the XML file but that you don't want
+    // to prompt the user about should appear down here.
+    // Some Sanitization
+	$data['base_url'] = '/'.basename($data['base_url']).'/';
+	$data['mgr_url'] = $data['base_url'].basename($data['mgr_url']).'/';
+	$data['connectors_url'] = $data['base_url'].basename($data['connectors_url']).'/';
 	
-	// Some defaults here.
-	// TODO: allow for installation in sub-directory
-	$data['core_path'] = getcwd().DIRECTORY_SEPARATOR.$target.'core/';
-	
-	$data['mgr_path'] = getcwd().DIRECTORY_SEPARATOR.$target.'manager/';
-	$data['mgr_url'] = '/manager/';
-	
-	$data['connectors_path'] = getcwd().DIRECTORY_SEPARATOR.$target.'connectors/';
-	$data['connectors_url'] = '/connectors/';
-	
-	$data['base_path'] = getcwd().DIRECTORY_SEPARATOR.$target;
-	$data['base_url'] = '/';
+    
+    // It would be weird to prompt the user for this again. --target = --base_path
+	$data['base_path'] = $target;
+	$data['mgr_path'] = $target.'manager/';
+	$data['connectors_path'] = $target.'connectors/';
 
+    // Security checks
+    if (strtolower($data['MODX Admin Username']) == 'admin') {
+        print '"admin" is not allowed as a MODX username because it is too insecure.';
+        goto ENTERNEWDATA; 
+    }
+				
 	$xml = get_xml($data);
 
 }
@@ -647,20 +739,24 @@ else {
 	$xml = file_get_contents($args['config']);
 }
 
+// Write the data to the XML file so MODX can read it
 write_xml($xml, $xml_path);
 
 // Test Database Connection?  We can't do this unless the user provided data.
 
-// Check that core/cache exists and is writeable
-prepare_modx($target);
+// Check that core/cache exists and is writeable, etc. etc.
+prepare_modx($data);
 
-// Run install
+//------------------------------------------------------------------------------
+// ! Run install
+//------------------------------------------------------------------------------
 print 'Off we go... installing MODX...'.PHP_EOL.PHP_EOL;
 // Via command line, we'd do this:
 // php setup/index.php --installmode=new --config=/path/to/config.xml
+// (MODX will automatically look for the config file inside setup/config.xml)
 // but here, we fake it.
 unset($argv);
-$argv[1] = '--installmode=new';
+$argv[1] = '--installmode='.$args['installmode'];
 include($target.'setup/index.php');
 
 print PHP_EOL;
