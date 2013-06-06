@@ -5,16 +5,17 @@
  *
  * (requires PHP 5.3.0 or greater)
  *
- * This script downloads latest version of MODX and installs it to the directory you 
- * specify.  The script prompts you for your login details.
+ * This script installs MODX Revolution locally or it upgrades an 
+ * existing installation to the latest version. There are many command-line 
+ * options you can use when executing the script, but if none are provided,
+ * you will be prompted for the necessary details.
  *
- * WARNING: this script may fail if there is poor network connectivity or if the 
+ * WARNING: It is hoped that this script will be useful, but no guarantee is 
+ * made or implied: USE THIS SCRIPT AT YOUR OWN RISK!!!
+ *
+ * Note: this script may fail if there is poor network connectivity or if the 
  * MODX site is unavailable.
  * 
- * When updating a site (--installmode=upgrade), we have some extra work to do
- *  Prompt the user to remind them to make a backup!!!
- *  Create an XML file if they didn't supply a --config option
- *  Log out all users.
  *
  * PARAMETERS
  *	--config specifies an XML configuration file to use (path is relative to PWD)
@@ -25,7 +26,7 @@
  *  --installmode : 'new' for new installs, 'upgrade' for upgrades. (default:new).
  *  --core_path : req'd if you are doing an upgrade.
  *
- * USAGE:
+ * SAMPLE USAGE:
  * 		php installmodx.php
  * 		php installmodx.php --config=myconfig.php
  * 		php installmodx.php --zip=modx-2.2.8-pl.zip
@@ -39,7 +40,7 @@
  * Everett Griffiths (everett@craftsmancoding.com)
  *
  * LAST UPDATED:
- * March 12, 2013
+ * June 5, 2013
  *
  * SEE ALSO
  * http://rtfm.modx.com/display/revolution20/Command+Line+Installation
@@ -50,18 +51,22 @@
 //------------------------------------------------------------------------------
 //! CONFIG (Devs only)
 //------------------------------------------------------------------------------
-// shows the most current version
+define('MODX_API_MODE', true);
+// Web page that shows the most current version of MODX
 define('INFO_PAGE', 'http://modx.com/download/'); 
 // append the modx version, e.g. modx-2.2.6.zip
 define('DOWNLOAD_PAGE', 'http://modx.com/download/direct/');
 define('ESC', 27);
 // we need PHP 5.3.0 for the CLI options and GOTO statements (yes, really)
 define('PHP_REQ_VER', '5.3.0');
-define('THIS_VERSION', '1.1');
+define('THIS_VERSION', '2.0');
 define('THIS_AUTHOR', 'Everett Griffiths (everett@craftsmancoding.com)');
 define('DIR_PERMS', 0777); // for cache, etc.
+// see http://www.tuxradar.com/practicalphp/16/1/1
 ignore_user_abort(true);
 set_time_limit(0);
+$sessiondir = 'tmp_sess_'.substr(md5('installmodx'.time()),-5);
+@mkdir($sessiondir,0777,true);
 //------------------------------------------------------------------------------
 //! Functions
 //------------------------------------------------------------------------------
@@ -71,7 +76,7 @@ set_time_limit(0);
 function abort($msg) {
 	print PHP_EOL.'FATAL ERROR! '.$msg . PHP_EOL;
 	print 'Aborting.'. PHP_EOL.PHP_EOL;
-	exit;
+	teardown();
 }
 
 /**
@@ -93,7 +98,7 @@ PARAMETERS:
 --zip : a MODX zip file, downloaded from ".DOWNLOAD_PAGE."
 --target : the base_path of your MODX install, can be relative e.g. public_html/
 --version : the version of MODX to install, e.g. 2.2.8-pl. Defaults to latest avail.
---installmode : 'new' for new installs, 'upgrade' for upgrades. (default:new).
+--installmode : 'new' for new installs (default), 'upgrade' for upgrades.
 --core_path : req'd if you are performing an upgrade.
 --help : displays this help page.
 
@@ -167,6 +172,9 @@ function preflight() {
 	if (!ini_get('date.timezone')) {
 		abort("You must set the date.timezone setting in your php.ini. Please set it to a proper timezone before proceeding.");
 	}
+	// Session dir
+	session_save_path($sessiondir);
+	ini_set('session.use_cookies', 0);
 }
 
 /** 
@@ -228,7 +236,7 @@ function get_args() {
 	
 	if (isset($opts['help'])) {
 		show_help();
-		exit;
+		teardown();
 	}
 	
 	if (isset($opts['config'])) {
@@ -355,6 +363,9 @@ function extract_zip($zipfile,$target,$verbose=false) {
 			$entry_name = $target . strip_first_dir($entry_name);
 			if ($verbose) {
                 print 'inflating: '. $entry_name .PHP_EOL;
+			}
+			else {
+                print '.';
 			}
 			$dir = dirname($entry_name);
 			// make all necessary directories in the file's path
@@ -632,7 +643,7 @@ function write_xml($contents,$xml_path) {
 		print 'or navigate to your site via a browser and do a normal installation.'.PHP_EOL.PHP_EOL;
 		print $contents;
 		print PHP_EOL.PHP_EOL;
-		exit;
+		teardown();
 	}
 }
 
@@ -642,7 +653,7 @@ function write_xml($contents,$xml_path) {
  *
  * @param string $target
  */
-function prepare_modx($data) {
+function prepare_modx_new($data) {
 	$base_path = $data['base_path'];
 	$core_path = $data['core_path'];
 	// Check that core/cache/ exists and is writeable
@@ -679,16 +690,42 @@ function prepare_modx($data) {
 	
 	// Lock down the core: activate core/ht.access
 	@rename($core_path.'ht.access', $core_path.'.htaccess');
-	
-	// if upgrade, do some magic
-	// logout all users
-	// clear cache
-	
+
+}
+
+/**
+ * Logout all users, clear the cache, make sure config file is writable
+ *
+ */
+function prepare_modx_upgrade($data) {
+    $core_path = $data['core_path'];
+    chmod($core_path.'config/config.inc.php', DIR_PERMS);
+    
+    require_once($data['base_path'].'index.php');
+    $modx= new modX();
+    $modx->initialize('mgr');
+    // See http://tracker.modx.com/issues/9916
+    $sessionTable = $modx->getTableName('modSession');
+    $modx->query("TRUNCATE TABLE {$sessionTable}");
+    $modx->cacheManager->refresh();
+}
+
+/**
+ * For clean breaks
+ */
+function teardown() {
+    rrmdir($src);
+    rrmdir($target.'setup');
+    rrmdir($sessiondir);
+    exit;
 }
 
 //------------------------------------------------------------------------------
 //! Vars
 //------------------------------------------------------------------------------
+$src = '';
+$target = '';
+$sessiondir = '';
 // Each spot in the array is a "frame" in our spinner animation
 $cursorArray = array('/','-','\\','|','/','-','\\','|'); 
 $i = 0; // for spinner iterations
@@ -718,7 +755,7 @@ print 'Are you ready to continue? (y/n) [n] > ';
 $yn = strtolower(trim(fgets(STDIN)));
 if ($yn!='y') {
 	print 'Catch you next time.' .PHP_EOL.PHP_EOL;
-	exit;
+	teardown();
 }
 print PHP_EOL;
 
@@ -799,8 +836,6 @@ $data = array();
 // inplace, unpacked, language, remove_setup_directory
 // We use the same XML body, so we have null out the placeholders
 if ($args['installmode'] == 'upgrade') {
-    $target = $data['base_path'];
-    
     include $args['core_path'] .'config/config.inc.php';
 	$data['database_type'] = $database_type;
 	$data['database_server'] = $database_server;
@@ -820,7 +855,9 @@ if ($args['installmode'] == 'upgrade') {
 	$data['base_path'] = MODX_BASE_PATH;
 	$data['mgr_path'] = MODX_MANAGER_PATH;
 	$data['connectors_path'] = MODX_CONNECTORS_PATH;
-
+	// A couple overrides
+    $target = $data['base_path'];
+    $xml_path = $target.'setup/config.xml';
     $xml = get_xml($data);
 }
 elseif (!$args['config']) {	
@@ -877,7 +914,7 @@ elseif (!$args['config']) {
 	$data['connectors_path'] = $target.basename($data['connectors_url']).'/';
 
     // Security checks
-    if (strtolower($data['MODX Admin Username']) == 'admin') {
+    if (strtolower($data['cmsadmin']) == 'admin') {
         print '"admin" is not allowed as a MODX username because it is too insecure.';
         goto ENTERNEWDATA; 
     }
@@ -887,16 +924,36 @@ elseif (!$args['config']) {
     // No duplicates? e.g manager != connectors
     
 	$xml = get_xml($data);
-
 }
 else {
 	// Get XML from config file
 	$xml = file_get_contents($args['config']);
+	// Fill $data array from XML (we need this data in order to do the unzipping correctly)
+	$xmldata = simplexml_load_file($args['config']);
+	$data['database_type'] = $xmldata->database_type;
+	$data['database_server'] = $xmldata->database_server;
+	$data['database'] = $xmldata->database;
+	$data['database_user'] = $xmldata->database_user;
+	$data['database_password'] = $xmldata->database_password;
+    $data['database_charset'] = $xmldata->database_connection_charset;
+	$data['database_collation'] = $xmldata->database_collation;
+	$data['table_prefix'] = $xmldata->table_prefix;
+	$data['cmsadmin'] = $xmldata->cmsadmin;
+	$data['cmsadminemail'] = $xmldata->cmsadminemail;
+	$data['cmspassword'] = $xmldata->cmspassword;
+	$data['core_path'] = $xmldata->core_path;
+    $data['base_url'] = $xmldata->context_web_url;
+	$data['mgr_url'] = $xmldata->context_mgr_url;
+	$data['connectors_url'] = $xmldata->context_connectors_url;    
+	$data['base_path'] = $xmldata->context_web_path;
+	$data['mgr_path'] = $xmldata->context_mgr_path;
+	$data['connectors_path'] = $xmldata->context_connectors_path;
+
 }
 
 // Extract the zip to a our temporary src dir
 // extract_zip needs the target to have a trailing slash!
-extract_zip($args['zip'],$src.DIRECTORY_SEPARATOR,true);
+extract_zip($args['zip'],$src.DIRECTORY_SEPARATOR,false);
 // Move into position 
 // (both src and dest. target dirs must NOT contain trailing slash)
 recursive_copy($src.'/connectors', $target.basename($data['connectors_path']));
@@ -907,7 +964,7 @@ recursive_copy($src.'/index.php', $target.'index.php');
 recursive_copy($src.'/config.core.php', $target.'config.core.php');
 recursive_copy($src.'/ht.access', $target.'ht.access');
 // cleanup
-rrmdir($src);
+
 
 // Write the data to the XML file so MODX can read it
 write_xml($xml, $xml_path);
@@ -916,12 +973,14 @@ if (!$args['config'] && $args['installmode'] != 'upgrade') {
 }
 
 // TODO: Test Database Connection?
-
-// Check that core/cache exists and is writeable, etc. etc.
-prepare_modx($data);
-
-// Upgrade only
-// unzip in place (from /tmp to core, connectors, manager, setup + index.php)
+// if upgrade, do some magic
+if ($args['installmode'] == 'upgrade') {
+    prepare_modx_upgrade($data);
+}
+else {
+    // Check that core/cache exists and is writeable, etc. etc.
+    prepare_modx_new($data);
+}
 
 //------------------------------------------------------------------------------
 // ! Run Setup
@@ -933,18 +992,21 @@ prepare_modx($data);
 unset($argv);
 if ($args['installmode'] == 'new') {
     print 'Installing MODX...'.PHP_EOL.PHP_EOL;
-    $argv[1] = '--installmode=new --core_path='.$data['core_path'];
+    $argv[1] = '--installmode=new';
+    $argv[2] = '--core_path='.$data['core_path'];
 }
 elseif ($args['installmode'] == 'upgrade') {
     print 'Updating MODX...'.PHP_EOL.PHP_EOL;
-    $argv[1] = '--installmode=upgrade --core_path='.$data['core_path'];
+    $argv[1] = '--installmode=upgrade';
+    $argv[2] = '--core_path='.$data['core_path'];
 }
-include $target.'setup/index.php';
+@include $target.'setup/index.php';
 
 print PHP_EOL;
 print 'You may now log into your MODX installation.'.PHP_EOL;
 print 'Thanks for using the MODX installer!'.PHP_EOL.PHP_EOL;
 
-rrmdir($target.'setup');
+// Tear down: TODO pcntl_signal?
+teardown();
 
 /*EOF*/
