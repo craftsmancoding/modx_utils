@@ -28,9 +28,10 @@
  * USAGE:
  * 		php installmodx.php
  * 		php installmodx.php --config=myconfig.php
- * 		php installmodx.php --zip=my-local-modx.zip
+ * 		php installmodx.php --zip=modx-2.2.8-pl.zip
  *      php installmodx.php --version=2.2.1-pl
  *      php installmodx.php --installmode=upgrade --core_path=public_html/core
+ *      php installmodx.php --installmode=upgrade --core_path=public_html/core --zip=modx-2.2.8-pl.zip
  *
  * See http://youtu.be/-FR10DR16CE for an example video of this in action.
  *
@@ -195,7 +196,7 @@ function print_banner() {
 
                                                        
 ";
-	print 'Version '.THIS_VERSION . str_repeat(' ', 15).'by '. THIS_AUTHOR . PHP_EOL;
+	print 'Version '.THIS_VERSION.str_repeat(' ', 15).'by '.THIS_AUTHOR.PHP_EOL;
 	print str_repeat(PHP_EOL,2);
 }
 
@@ -230,8 +231,10 @@ function get_args() {
 		exit;
 	}
 	
-	if (isset($opts['config']) && !file_exists($opts['config'])) {
-		abort('XML configuration file not found. ' . $opts['config']);
+	if (isset($opts['config'])) {
+        if (!file_exists($opts['config'])) {
+		  abort('XML configuration file not found. ' . $opts['config']);
+        }
 	}
 	else {
 		$opts['config'] = false;
@@ -256,6 +259,7 @@ function get_args() {
         if (!isset($opts['core_path'])) {
             abort('--core_path must be set for upgrades: we need it to locate your existing installation.');
         }
+        // Careful: realpath may return false
         $opts['core_path'] = realpath($opts['core_path']).DIRECTORY_SEPARATOR;
         if (!file_exists($opts['core_path'] .'config/config.inc.php')) {
             abort('Invalid --core_path. Could not locate '.$opts['core_path'] .'config/config.inc.php');   
@@ -335,9 +339,10 @@ function download_modx($modx_zip) {
  * See http://stackoverflow.com/questions/5256551/unzip-the-file-using-php-collapses-the-zip-file-into-one-folder
  *
  * @param string $zipfile (relative to this script, e.g. myfile.zip)
- * @param string $target path where we want to setup MODX, e.g. public_html/
+ * @param string $target path where we want to install MODX, e.g. public_html/
+ * @param boolean $verbose. If true, file names are printed as they are extracted
  */
-function extract_zip($zipfile,$target) {
+function extract_zip($zipfile,$target,$verbose=false) {
 
 	$z = zip_open($zipfile) or die("can't open $zipfile: $php_errormsg");
 	while ($entry = zip_read($z)) {
@@ -348,7 +353,9 @@ function extract_zip($zipfile,$target) {
 		if (zip_entry_filesize($entry)) {
 			// Put this in our own directory
 			$entry_name = $target . strip_first_dir($entry_name);
-			print 'inflating: '. $entry_name .PHP_EOL;
+			if ($verbose) {
+                print 'inflating: '. $entry_name .PHP_EOL;
+			}
 			$dir = dirname($entry_name);
 			// make all necessary directories in the file's path
 			if (!is_dir($dir)) { 
@@ -394,9 +401,23 @@ function get_data($data) {
 	
 	// Add some descriptive labels to any field that needs extra descriptions
 	$help = array();
+    $help['database_type'] = 'Database Type';
+	$help['database_server'] = 'Database Server';
+	$help['database'] = 'Database Name';
+	$help['database_user'] = 'Database User';
+	$help['database_password'] = 'Database Password';
+    $help['database_connection_charset'] = 'Database Charset';
+	$help['database_collation'] = 'Database Collation';
+	$help['table_prefix'] = 'Table Prefix';
+		
+	$help['cmsadmin'] = 'MODX Admin Username';
+	$help['cmsadminemail'] = 'MODX Admin Email';
+	$help['cmspassword'] = 'MODX Admin Password';
+
+	$help['core_path'] = 'Core Folder (will be relative to the base path)';
 	$help['base_url'] = 'Base URL (change this only if you are installing to a sub-directory)';
-	$data['mgr_url'] = 'Manager URL segment (change to a non-standard location for security)';
-	$data['connectors_url'] = 'Connectors URL segment';	
+	$help['mgr_url'] = 'Manager URL segment (change to a non-standard location for security)';
+	$help['connectors_url'] = 'Connectors URL segment';	
 	
 	foreach($data as $k => $v) {
 		$default_label = ''; // with [brackets]
@@ -455,15 +476,15 @@ Created by the modxinstaller.php script.
 https://github.com/craftsmancoding/modx_utils
 -->
 <modx>
-	<database_type>'.$data['Database Type'].'</database_type>
-    <database_server>'.$data['Database Server'].'</database_server>
-    <database>'.$data['Database Name'].'</database>
-    <database_user>'.$data['Database User'].'</database_user>
-    <database_password>'.$data['Database Password'].'</database_password>
-    <database_connection_charset>'.$data['Database Charset'].'</database_connection_charset>
-    <database_charset>'.$data['Database Charset'].'</database_charset>
-    <database_collation>'.$data['Database Collation'].'</database_collation>
-    <table_prefix>'.$data['Table Prefix'].'</table_prefix>
+	<database_type>'.$data['database_type'].'</database_type>
+    <database_server>'.$data['database_server'].'</database_server>
+    <database>'.$data['database'].'</database>
+    <database_user>'.$data['database_user'].'</database_user>
+    <database_password>'.$data['database_password'].'</database_password>
+    <database_connection_charset>'.$data['database_charset'].'</database_connection_charset>
+    <database_charset>'.$data['database_charset'].'</database_charset>
+    <database_collation>'.$data['database_collation'].'</database_collation>
+    <table_prefix>'.$data['table_prefix'].'</table_prefix>
     <https_port>443</https_port>
     <http_host>localhost</http_host>
     <cache_disabled>0</cache_disabled>
@@ -481,9 +502,9 @@ https://github.com/craftsmancoding/modx_utils
     <language>en</language>
 
     <!-- Information for your administrator account -->
-    <cmsadmin>'.$data['MODX Admin Username'].'</cmsadmin>
-    <cmspassword>'.$data['MODX Admin Password'].'</cmspassword>
-    <cmsadminemail>'.$data['MODX Admin Email'].'</cmsadminemail>
+    <cmsadmin>'.$data['cmsadmin'].'</cmsadmin>
+    <cmspassword>'.$data['cmspassword'].'</cmspassword>
+    <cmsadminemail>'.$data['cmsadminemail'].'</cmsadminemail>
 
     <!-- Paths for your MODX core directory -->
     <core_path>'.$data['core_path'].'</core_path>
@@ -501,6 +522,95 @@ https://github.com/craftsmancoding/modx_utils
 </modx>';
 	
 	return $xml;
+}
+
+/**
+ * From http://www.php.net/manual/en/function.copy.php#91256
+ * Copy file or folder from source to destination
+ * @param string $source file or folder
+ * @param string $dest   file or folder
+ * @param array $options (optional) folderPermission,filePermission
+ * @return boolean
+ */
+function recursive_copy($source, $dest, $options=array('folderPermission'=>0755, 'filePermission'=>0755)) {
+	$result=false;
+
+	if (is_file($source)) {
+		if ($dest[strlen($dest)-1]=='/') {
+			if (!file_exists($dest)) {
+				cmfcDirectory::makeAll($dest, $options['folderPermission'], true);
+			}
+			$__dest=$dest.'/'.basename($source);
+		} 
+		else {
+			$__dest=$dest;
+		}
+		$result=copy($source, $__dest);
+		chmod($__dest, $options['filePermission']);
+
+	} 
+	elseif (is_dir($source)) {
+		if ($dest[strlen($dest)-1]=='/') {
+			if ($source[strlen($source)-1]=='/') {
+				//Copy only contents
+			} 
+			else {
+				//Change parent itself and its contents
+				$dest=$dest.basename($source);
+				@mkdir($dest);
+				chmod($dest, $options['filePermission']);
+			}
+		} 
+		else {
+			if ($source[strlen($source)-1]=='/') {
+				//Copy parent directory with new name and all its content
+				@mkdir($dest, $options['folderPermission']);
+				chmod($dest, $options['filePermission']);
+			} 
+			else {
+				//Copy parent directory with new name and all its content
+				@mkdir($dest, $options['folderPermission']);
+				chmod($dest, $options['filePermission']);
+			}
+		}
+
+		$dirHandle=opendir($source);
+		while ($file=readdir($dirHandle)) {
+			if ($file!='.' && $file!='..') {
+				if (!is_dir($source."/".$file)) {
+					$__dest=$dest.'/'.$file;
+				} 
+				else {
+					$__dest=$dest.'/'.$file;
+				}
+				//echo "$source/$file ||| $__dest<br />";
+				$result=recursive_copy($source."/".$file, $__dest, $options);
+			}
+		}
+		closedir($dirHandle);
+
+	} 
+	else {
+		$result=false;
+	}
+	return $result;
+}
+
+/**
+ * Delete a non-empty directory (recursivley)
+ * http://stackoverflow.com/questions/1653771/how-do-i-remove-a-directory-that-is-not-empty
+ */
+function rrmdir($dir) {
+    if (is_dir($dir)) {
+        $objects = scandir($dir);
+        foreach ($objects as $object) {
+            if ($object != "." && $object != "..") {
+                if (filetype($dir."/".$object) == "dir") rrmdir($dir."/".$object); else unlink($dir."/".$object);
+            }
+        }
+        reset($objects);
+        rmdir($dir);
+    }
 }
 
 /**
@@ -539,45 +649,41 @@ function prepare_modx($data) {
 	if (!file_exists($core_path.'cache')) {
 		@mkdir($core_path.'cache',0777,true); 
 	}
-	if (!is_writable($core_path.'cache')) {
-		chmod($core_path.'cache', DIR_PERMS);
-	}
+    chmod($core_path.'cache', DIR_PERMS);
+
 	
 	// Check that core/components/ exists and is writeable
 	if (!file_exists($core_path.'components')) {
 		@mkdir($core_path.'components',0777,true); 
 	}
-	if (!is_writable($core_path.'components')) {
-		chmod($core_path.'components', DIR_PERMS);
-	}
-	
+	chmod($core_path.'components', DIR_PERMS);
+
 	// Check that assets/components/ exists and is writeable
 	if (!file_exists($base_path.'assets/components')) {
 		@mkdir($base_path.'assets/components',0777,true); 
 	}
-	if (!is_writable($base_path.'assets/components')) {
-		chmod($base_path.'assets/components', DIR_PERMS);
-	}
+    chmod($base_path.'assets/components', DIR_PERMS);
 
 	// Check that core/export/ exists and is writable
 	if (!file_exists($core_path.'export')) {
 		@mkdir($core_path.'export',0777,true); 
 	}
-	if (!is_writable($core_path.'export')) {
-		chmod($core_path.'export', DIR_PERMS);
-	}
+    chmod($core_path.'export', DIR_PERMS);
 	
 	// touch the config file
 	if (!file_exists($core_path.'config/config.inc.php')) {
 		@mkdir($core_path.'config',0777,true); 
 		touch($core_path.'config/config.inc.php');
 	}
-	if (!is_writable($core_path.'config/config.inc.php')) {
-		chmod($core_path.'config/config.inc.php', DIR_PERMS);
-	}
+    chmod($core_path.'config/config.inc.php', DIR_PERMS);
 	
 	// Lock down the core: activate core/ht.access
 	@rename($core_path.'ht.access', $core_path.'.htaccess');
+	
+	// if upgrade, do some magic
+	// logout all users
+	// clear cache
+	
 }
 
 //------------------------------------------------------------------------------
@@ -597,6 +703,8 @@ preflight();
 
 // Read and validate any command-line arguments
 $args = get_args();
+
+// TODO: Are we fast-tracked?  Jump somewhere...
 
 // Some eye-candy...
 print_banner();
@@ -641,9 +749,7 @@ else {
 }
 
 // Prompt the user for target
-if (!$args['target']) {
-	// Default: 
-	// TODO: if upgrade, read MODX_BASE_PATH
+if ($args['installmode'] == 'new' && !$args['target']) {
 	$args['target'] = pathinfo($args['zip'],PATHINFO_FILENAME).DIRECTORY_SEPARATOR;
 	print PHP_EOL."Where should this be extracted? [".$args['target']."] > ";
 	$target_path = trim(fgets(STDIN));
@@ -652,25 +758,35 @@ if (!$args['target']) {
 	}
 }
 
-// make sure we have a trailing slash on the target dir
-//$target = basename($args['target']).DIRECTORY_SEPARATOR; 
-$target = realpath($target).DIRECTORY_SEPARATOR;
-
-// Does the target exist?
-if (file_exists($target)) {
-    if (!is_dir($target)) {
-        abort($target .' must be a directory!');
-    }
-}
-else {
-    @mkdir($target,0777,true);
-}
 // Did we actually get the zip file?
 if (!filesize($args['zip'])) {
     abort($args['zip'] . ' is an empty file. Did you specify a valid version?');
 }
 
-extract_zip($args['zip'],$target);
+
+// Does the target exist?
+if (file_exists($args['target'])) {
+    if (!is_dir($args['target'])) {
+        abort($args['target'] .' must be a directory!');
+    }
+}
+else {
+    @mkdir($args['target'],0777,true);
+}
+// make sure we have a trailing slash on the target dir
+// REMEMBER: realpath returns false if the dir doesn't exist
+$target = realpath($args['target']).DIRECTORY_SEPARATOR;
+
+// Get ourselves a random dir we can unzip to. This dir will be the src dir for the copy operation
+$tmpdir = 'tmp_modx_'.substr(md5('installmodx'.time()),-5);
+// Does the staging area src directory exist?
+if (file_exists($tmpdir)) {
+    abort('Whoops. We wanted to use '.$tmpdir.' as a tmp dir, but it already exists.');
+}
+else {
+    @mkdir($tmpdir,0777,true);
+}
+$src = realpath($tmpdir);
 
 // We can skip a lot of stuff if the user supplied an XML config...
 // otherwise we have to ask them a bunch of stuff.
@@ -679,28 +795,56 @@ $xml_path = $target.'setup/config.xml';
 
 $data = array();
 
-if (!$args['config']) {	
+// If we are upgrading, we can read everything we need.  Our XML config only needs these items
+// inplace, unpacked, language, remove_setup_directory
+// We use the same XML body, so we have null out the placeholders
+if ($args['installmode'] == 'upgrade') {
+    $target = $data['base_path'];
+    
+    include $args['core_path'] .'config/config.inc.php';
+	$data['database_type'] = $database_type;
+	$data['database_server'] = $database_server;
+	$data['database'] = $dbase;
+	$data['database_user'] = $database_user;
+	$data['database_password'] = $database_password;
+    $data['database_charset'] = $database_connection_charset;
+	$data['database_collation'] = ''; // ??
+	$data['table_prefix'] = $table_prefix;
+	$data['cmsadmin'] = '';
+	$data['cmsadminemail'] = '';
+	$data['cmspassword'] = '';
+	$data['core_path'] = $args['core_path'];
+    $data['base_url'] = MODX_BASE_URL;
+	$data['mgr_url'] = MODX_MANAGER_URL;
+	$data['connectors_url'] = MODX_CONNECTORS_URL;    
+	$data['base_path'] = MODX_BASE_PATH;
+	$data['mgr_path'] = MODX_MANAGER_PATH;
+	$data['connectors_path'] = MODX_CONNECTORS_PATH;
+
+    $xml = get_xml($data);
+}
+elseif (!$args['config']) {	
 	// Put anything here that you want to prompt the user about.
 	// If you include a value, that value will be used as the default.
-	$data['Database Type'] = 'mysql';
-	$data['Database Server'] = 'localhost';
-	$data['Database Name'] = '';
-	$data['Database User'] = '';
-	$data['Database Password'] = '';
-    $data['Database Charset'] = 'utf8';
-	$data['Database Collation'] = 'utf8_general_ci';
-	$data['Table Prefix'] = 'modx_';
+	$data['database_type'] = 'mysql';
+	$data['database_server'] = 'localhost';
+	$data['database'] = '';
+	$data['database_user'] = '';
+	$data['database_password'] = '';
+    $data['database_charset'] = 'utf8';
+	$data['database_collation'] = 'utf8_general_ci';
+	$data['table_prefix'] = 'modx_';
 
-	$data['core_path'] = $target.'core/';	
+	$data['core_path'] = 'core';
 
     $data['base_url'] = '/';
-	$data['mgr_url'] = '/manager/';
-	$data['connectors_url'] = '/connectors/';
+	$data['mgr_url'] = 'manager';
+	$data['connectors_url'] = 'connectors';
 	
 	
-	$data['MODX Admin Username'] = '';
-	$data['MODX Admin Email'] = '';
-	$data['MODX Admin Password'] = '';
+	$data['cmsadmin'] = '';
+	$data['cmsadminemail'] = '';
+	$data['cmspassword'] = '';
 
 
 	ENTERNEWDATA:
@@ -710,27 +854,38 @@ if (!$args['config']) {
 	print PHP_EOL. "Is this correct? (y/n) [n] >";
 	$yn = strtolower(trim(fgets(STDIN)));
 	if ($yn != 'y') {
-		goto ENTERNEWDATA; // yeah... 1980 called and wants their code back.
-	}	
+		goto ENTERNEWDATA; // 1980 called and wants their code back.
+	}
     // Anything that needs to appear in the XML file but that you don't want
     // to prompt the user about should appear down here.
     // Some Sanitization
-	$data['base_url'] = '/'.basename($data['base_url']).'/';
+    $data['core_path'] = $target.basename($data['core_path']).DIRECTORY_SEPARATOR;
+    $base_url = basename($data['base_url']);    
+    if (empty($base_url)) {
+        $data['base_url'] = '/';
+    }
+    else {
+        $data['base_url'] = '/'.basename($data['base_url']).'/';
+    }
 	$data['mgr_url'] = $data['base_url'].basename($data['mgr_url']).'/';
 	$data['connectors_url'] = $data['base_url'].basename($data['connectors_url']).'/';
 	
     
-    // It would be weird to prompt the user for this again. --target = --base_path
+    // --target = --base_path
 	$data['base_path'] = $target;
-	$data['mgr_path'] = $target.'manager/';
-	$data['connectors_path'] = $target.'connectors/';
+	$data['mgr_path'] = $target.basename($data['mgr_url']).'/';
+	$data['connectors_path'] = $target.basename($data['connectors_url']).'/';
 
     // Security checks
     if (strtolower($data['MODX Admin Username']) == 'admin') {
         print '"admin" is not allowed as a MODX username because it is too insecure.';
         goto ENTERNEWDATA; 
     }
-				
+    if (in_array('setup', array($data['core_path'],$data['base_url'],$data['mgr_url']))) {
+        print '"setup" is not allowed as a path or URL option because it is reserved for the installation process.';
+    }
+    // No duplicates? e.g manager != connectors
+    
 	$xml = get_xml($data);
 
 }
@@ -739,27 +894,57 @@ else {
 	$xml = file_get_contents($args['config']);
 }
 
+// Extract the zip to a our temporary src dir
+// extract_zip needs the target to have a trailing slash!
+extract_zip($args['zip'],$src.DIRECTORY_SEPARATOR,true);
+// Move into position 
+// (both src and dest. target dirs must NOT contain trailing slash)
+recursive_copy($src.'/connectors', $target.basename($data['connectors_path']));
+recursive_copy($src.'/core', $target.basename($data['core_path']));
+recursive_copy($src.'/manager', $target.basename($data['mgr_path']));
+recursive_copy($src.'/setup', $target.'setup');
+recursive_copy($src.'/index.php', $target.'index.php');
+recursive_copy($src.'/config.core.php', $target.'config.core.php');
+recursive_copy($src.'/ht.access', $target.'ht.access');
+// cleanup
+rrmdir($src);
+
 // Write the data to the XML file so MODX can read it
 write_xml($xml, $xml_path);
+if (!$args['config'] && $args['installmode'] != 'upgrade') {
+    write_xml($xml, 'config.xml'); // backup for later
+}
 
-// Test Database Connection?  We can't do this unless the user provided data.
+// TODO: Test Database Connection?
 
 // Check that core/cache exists and is writeable, etc. etc.
 prepare_modx($data);
 
+// Upgrade only
+// unzip in place (from /tmp to core, connectors, manager, setup + index.php)
+
 //------------------------------------------------------------------------------
-// ! Run install
+// ! Run Setup
 //------------------------------------------------------------------------------
-print 'Off we go... installing MODX...'.PHP_EOL.PHP_EOL;
 // Via command line, we'd do this:
 // php setup/index.php --installmode=new --config=/path/to/config.xml
 // (MODX will automatically look for the config file inside setup/config.xml)
 // but here, we fake it.
 unset($argv);
-$argv[1] = '--installmode='.$args['installmode'];
-include($target.'setup/index.php');
+if ($args['installmode'] == 'new') {
+    print 'Installing MODX...'.PHP_EOL.PHP_EOL;
+    $argv[1] = '--installmode=new --core_path='.$data['core_path'];
+}
+elseif ($args['installmode'] == 'upgrade') {
+    print 'Updating MODX...'.PHP_EOL.PHP_EOL;
+    $argv[1] = '--installmode=upgrade --core_path='.$data['core_path'];
+}
+include $target.'setup/index.php';
 
 print PHP_EOL;
 print 'You may now log into your MODX installation.'.PHP_EOL;
 print 'Thanks for using the MODX installer!'.PHP_EOL.PHP_EOL;
+
+rrmdir($target.'setup');
+
 /*EOF*/
