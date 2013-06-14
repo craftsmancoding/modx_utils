@@ -479,7 +479,7 @@ function print_review_data($data) {
 function get_xml($data) {	
 	
 	// Write XML File
-	$xml = '
+	$xml = '<?xml version="1.0" ?>
 <!--
 Configuration file for MODX Revolution
 
@@ -487,15 +487,15 @@ Created by the modxinstaller.php script.
 https://github.com/craftsmancoding/modx_utils
 -->
 <modx>
-	<database_type>'.$data['database_type'].'</database_type>
-    <database_server>'.$data['database_server'].'</database_server>
-    <database>'.$data['database'].'</database>
-    <database_user>'.$data['database_user'].'</database_user>
-    <database_password>'.$data['database_password'].'</database_password>
-    <database_connection_charset>'.$data['database_charset'].'</database_connection_charset>
-    <database_charset>'.$data['database_charset'].'</database_charset>
-    <database_collation>'.$data['database_collation'].'</database_collation>
-    <table_prefix>'.$data['table_prefix'].'</table_prefix>
+	<database_type>'.htmlspecialchars($data['database_type'],ENT_NOQUOTES).'</database_type>
+    <database_server>'.htmlspecialchars($data['database_server'],ENT_NOQUOTES).'</database_server>
+    <database>'.htmlspecialchars($data['database'],ENT_NOQUOTES).'</database>
+    <database_user>'.htmlspecialchars($data['database_user'],ENT_NOQUOTES).'</database_user>
+    <database_password>'.htmlspecialchars($data['database_password'],ENT_NOQUOTES).'</database_password>
+    <database_connection_charset>'.htmlspecialchars($data['database_charset'],ENT_NOQUOTES).'</database_connection_charset>
+    <database_charset>'.htmlspecialchars($data['database_charset'],ENT_NOQUOTES).'</database_charset>
+    <database_collation>'.htmlspecialchars($data['database_collation'],ENT_NOQUOTES).'</database_collation>
+    <table_prefix>'.htmlspecialchars($data['table_prefix'],ENT_NOQUOTES).'</table_prefix>
     <https_port>443</https_port>
     <http_host>localhost</http_host>
     <cache_disabled>0</cache_disabled>
@@ -513,20 +513,20 @@ https://github.com/craftsmancoding/modx_utils
     <language>en</language>
 
     <!-- Information for your administrator account -->
-    <cmsadmin>'.$data['cmsadmin'].'</cmsadmin>
-    <cmspassword>'.$data['cmspassword'].'</cmspassword>
-    <cmsadminemail>'.$data['cmsadminemail'].'</cmsadminemail>
+    <cmsadmin>'.htmlspecialchars($data['cmsadmin'],ENT_NOQUOTES).'</cmsadmin>
+    <cmspassword>'.htmlspecialchars($data['cmspassword'],ENT_NOQUOTES).'</cmspassword>
+    <cmsadminemail>'.htmlspecialchars($data['cmsadminemail'],ENT_NOQUOTES).'</cmsadminemail>
 
     <!-- Paths for your MODX core directory -->
-    <core_path>'.$data['core_path'].'</core_path>
+    <core_path>'.htmlspecialchars($data['core_path'],ENT_NOQUOTES).'</core_path>
 
     <!-- Paths for the default contexts that are installed. -->
-    <context_mgr_path>'.$data['mgr_path'].'</context_mgr_path>
-    <context_mgr_url>'.$data['mgr_url'].'</context_mgr_url>
-    <context_connectors_path>'.$data['connectors_path'].'</context_connectors_path>
-    <context_connectors_url>'.$data['connectors_url'].'</context_connectors_url>
-    <context_web_path>'.$data['base_path'].'</context_web_path>
-    <context_web_url>'.$data['base_url'].'</context_web_url>
+    <context_mgr_path>'.htmlspecialchars($data['mgr_path'],ENT_NOQUOTES).'</context_mgr_path>
+    <context_mgr_url>'.htmlspecialchars($data['mgr_url'],ENT_NOQUOTES).'</context_mgr_url>
+    <context_connectors_path>'.htmlspecialchars($data['connectors_path'],ENT_NOQUOTES).'</context_connectors_path>
+    <context_connectors_url>'.htmlspecialchars($data['connectors_url'],ENT_NOQUOTES).'</context_connectors_url>
+    <context_web_path>'.htmlspecialchars($data['base_path'],ENT_NOQUOTES).'</context_web_path>
+    <context_web_url>'.htmlspecialchars($data['base_url'],ENT_NOQUOTES).'</context_web_url>
 
     <!-- Whether or not to remove the setup/ directory after installation. -->
     <remove_setup_directory>1</remove_setup_directory>
@@ -861,6 +861,9 @@ if ($args['installmode'] == 'upgrade') {
     $xml = get_xml($data);
 }
 elseif (!$args['config']) {	
+    
+    $error_flag = false;
+    
 	// Put anything here that you want to prompt the user about.
 	// If you include a value, that value will be used as the default.
 	$data['database_type'] = 'mysql';
@@ -895,7 +898,7 @@ elseif (!$args['config']) {
 	}
     // Anything that needs to appear in the XML file but that you don't want
     // to prompt the user about should appear down here.
-    // Some Sanitization
+    // Some Sanitization/validation
     $data['core_path'] = $target.basename($data['core_path']).DIRECTORY_SEPARATOR;
     $base_url = basename($data['base_url']);    
     if (empty($base_url)) {
@@ -913,15 +916,27 @@ elseif (!$args['config']) {
 	$data['mgr_path'] = $target.basename($data['mgr_url']).'/';
 	$data['connectors_path'] = $target.basename($data['connectors_url']).'/';
 
-    // Security checks
+    // Security/validation checks
     if (strtolower($data['cmsadmin']) == 'admin') {
         print '"admin" is not allowed as a MODX username because it is too insecure.';
-        goto ENTERNEWDATA; 
+        $error_flag = true;
     }
     if (in_array('setup', array($data['core_path'],$data['base_url'],$data['mgr_url']))) {
-        print '"setup" is not allowed as a path or URL option because it is reserved for the installation process.';
+        print '"setup" is not allowed as a path or URL option because it is reserved for the installation process.';        
+        $error_flag = true;
     }
+    if (!filter_var($data['cmsadminemail'], FILTER_VALIDATE_EMAIL)) {
+        print 'Invalid email address';
+        $error_flag = true;    
+    }
+    // $data['database_type']
+    // $data['database_server']
+    // $data['database_user']
     // No duplicates? e.g manager != connectors
+    
+    if ($error_flag) {
+        goto ENTERNEWDATA; 
+    }
     
 	$xml = get_xml($data);
 }
