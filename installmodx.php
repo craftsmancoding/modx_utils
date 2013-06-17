@@ -59,7 +59,7 @@ define('DOWNLOAD_PAGE', 'http://modx.com/download/direct/');
 define('ESC', 27);
 // we need PHP 5.3.0 for the CLI options and GOTO statements (yes, really)
 define('PHP_REQ_VER', '5.3.0');
-define('THIS_VERSION', '2.0');
+define('THIS_VERSION', '2.1');
 define('THIS_AUTHOR', 'Everett Griffiths (everett@craftsmancoding.com)');
 define('DIR_PERMS', 0777); // for cache, etc.
 // see http://www.tuxradar.com/practicalphp/16/1/1

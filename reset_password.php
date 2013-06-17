@@ -77,6 +77,13 @@ if (!$user) {
 $user->set('username',$username);
 $user->set('active',1);
 $user->set('password', $password);
+
+// Sometimes the profile isn't available until we explicitly get it
+$profile = $user->getOne('Profile');
+if (!$profile) {
+    $profile = $modx->newObject('modUserProfile');
+    $user->addOne($profile);
+}
 $user->Profile->set('email', $email);
 $user->Profile->set('blocked', 0);
 $user->Profile->set('blockeduntil', 0);
