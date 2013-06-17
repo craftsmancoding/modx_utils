@@ -33,14 +33,27 @@
  *
  *      wget https://raw.github.com/craftsmancoding/modx_utils/master/installmodx.php
  *
- * Then run the script via the command line, e.g.
+ * Then run the script via the command line.  The simplest invocation is to just run the 
+ * script without any options:
  *
  * 		php installmodx.php
- * 		php installmodx.php --config=myconfig.php
+ *
+ * You can supply options when you run the script, e.g. to verbosely do a new install:
+ *  
+ *      php installmodx.php --installmode=new
+ *
+ * If you already have a zip file downloaded, you can skip the download:
+ *
  * 		php installmodx.php --zip=modx-2.2.8-pl.zip
- *      php installmodx.php --version=2.2.1-pl
+ *
+ * You can avoid all kinds of prompts if you supply the script with a configuration XML file:
+ *
+ * 		php installmodx.php --config=myconfig.php
+ * 
+ * To upgrade an existing installation, follow the prompts, or supply the following  options:
+ *
  *      php installmodx.php --installmode=upgrade --core_path=public_html/core
- *      php installmodx.php --installmode=upgrade --core_path=public_html/core --zip=modx-2.2.8-pl.zip
+ *
  *
  * See http://youtu.be/-FR10DR16CE for an example video of this in action.
  *
@@ -48,7 +61,7 @@
  * Everett Griffiths (everett@craftsmancoding.com)
  *
  * LAST UPDATED:
- * June 5, 2013
+ * June 17, 2013
  *
  * SEE ALSO
  * http://rtfm.modx.com/display/revolution20/Command+Line+Installation
@@ -1051,7 +1064,7 @@ else {
 
 }
 
-print 'Extracting zip file.'.PHP_EOL;
+print PHP_EOL. 'Extracting zip file.';
 // Extract the zip to a our temporary src dir
 // extract_zip needs the target to have a trailing slash!
 extract_zip($args['zip'],$src.DIRECTORY_SEPARATOR,false);
