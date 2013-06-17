@@ -280,6 +280,9 @@ function get_args() {
         }        
     }
 
+    if (!isset($opts['core_path'])) {
+        $opts['core_path'] = '';
+    }
 	return $opts;
 }
 
@@ -744,8 +747,11 @@ function prepare_modx_upgrade($data) {
  */
 function teardown() {
     global $src, $target, $sessiondir;
+    print "Cleaning up $src". PHP_EOL;
     rrmdir($src);
+    print "Cleaning up $target".'setup'. PHP_EOL;
     rrmdir($target.'setup');
+    print "Cleaning up $sessiondir";
     rrmdir($sessiondir);
     exit;
 }
