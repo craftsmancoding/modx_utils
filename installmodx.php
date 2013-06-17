@@ -65,7 +65,7 @@ define('DIR_PERMS', 0777); // for cache, etc.
 // see http://www.tuxradar.com/practicalphp/16/1/1
 ignore_user_abort(true);
 set_time_limit(0);
-$sessiondir = 'tmp_sess_'.substr(md5('installmodx'.time()),-5);
+$sessiondir = 'tmp_sess'; // .substr(md5('installmodx'.time()),-5);
 @mkdir($sessiondir,0777,true);
 //------------------------------------------------------------------------------
 //! Functions
@@ -257,13 +257,13 @@ function get_args() {
 	   $opts['version'] = 'latest';
 	}
 	if (!isset($opts['installmode'])) {
-	   $opts['installmode'] = 'new';
+	   $opts['installmode'] = '';
     }
     elseif (!in_array($opts['installmode'], array('new','upgrade'))) {
         show_help();
         abort('Invalid argument for --installmode. It supports "new" or "upgrade"');
     }
-    elseif($opts['installmode'] != 'new') {
+    elseif($opts['installmode'] == 'upgrade') {
         if (!isset($opts['core_path'])) {
             abort('--core_path must be set for upgrades: we need it to locate your existing installation.');
         }
@@ -315,7 +315,7 @@ function download_modx($modx_zip) {
 	global $zip_url;
 	$zip_url = DOWNLOAD_PAGE.$modx_zip;
 	$local_file = $modx_zip; // TODO: different location?
-	print "Downloading $zip_url".PHP_EOL;
+	print "Downloading from $zip_url".PHP_EOL;
 	printf( "%c[2J", ESC ); //clear screen
 	
 	$fp = fopen($local_file, 'w');
@@ -425,7 +425,7 @@ function get_data($data) {
 	$help['cmsadminemail'] = 'MODX Admin Email';
 	$help['cmspassword'] = 'MODX Admin Password';
 
-	$help['core_path'] = 'Core Folder (will be relative to the base path)';
+	$help['core_path'] = 'Core Folder (relative to the base path)';
 	$help['base_url'] = 'Base URL (change this only if you are installing to a sub-directory)';
 	$help['mgr_url'] = 'Manager URL segment (change to a non-standard location for security)';
 	$help['connectors_url'] = 'Connectors URL segment';	
@@ -608,6 +608,28 @@ function recursive_copy($source, $dest, $options=array('folderPermission'=>0755,
 }
 
 /**
+ * Convert a path $stub relative to a $base path into an absolute path.
+ * @string $base path w trailing slash
+ * @string $rel relative path stub
+ */
+function rel_to_abspath($base, $rel) {
+    $path = '';
+    // if /
+    if (substr($rel,0,1) == '/') {
+        $path = $rel;
+    }
+    // if ..
+    elseif (substr($rel,0,2) == '..') {
+        $path = $base . $rel;
+    }
+    else {
+        $path = $base.basename($rel);
+    }
+    // Add trailing slash
+    return rtrim($path, '/').DIRECTORY_SEPARATOR;
+}
+ 
+/**
  * Delete a non-empty directory (recursivley)
  * http://stackoverflow.com/questions/1653771/how-do-i-remove-a-directory-that-is-not-empty
  */
@@ -701,19 +723,21 @@ function prepare_modx_upgrade($data) {
     $core_path = $data['core_path'];
     chmod($core_path.'config/config.inc.php', DIR_PERMS);
     
+    // This might brick if the install isn't working.
     require_once($data['base_path'].'index.php');
     $modx= new modX();
     $modx->initialize('mgr');
     // See http://tracker.modx.com/issues/9916
     $sessionTable = $modx->getTableName('modSession');
     $modx->query("TRUNCATE TABLE {$sessionTable}");
-    $modx->cacheManager->refresh();
+    @$modx->cacheManager->refresh();
 }
 
 /**
  * For clean breaks
  */
 function teardown() {
+    global $src, $target, $sessiondir;
     rrmdir($src);
     rrmdir($target.'setup');
     rrmdir($sessiondir);
@@ -741,7 +765,7 @@ preflight();
 // Read and validate any command-line arguments
 $args = get_args();
 
-// TODO: Are we fast-tracked?  Jump somewhere...
+// TODO: Are we fast-tracked?  Skip the eye-candy and jump somewhere...
 
 // Some eye-candy...
 print_banner();
@@ -759,6 +783,18 @@ if ($yn!='y') {
 }
 print PHP_EOL;
 
+// New install or upgrade?
+if (!$args['installmode']) {
+    print 'Is this a new install? [y] > ';
+    $yn = strtolower(trim(fgets(STDIN)));
+    if ($yn == 'n') {
+        $args['installmode'] = 'upgrade';
+    }
+    else {
+        $args['installmode'] = 'new';
+    }
+}
+
 // Skip downloading if we've already got a zip file
 if (isset($args['zip']) && !empty($args['zip'])) {
 	print 'Using existing zip file: '.$args['zip'] . PHP_EOL;
@@ -774,45 +810,73 @@ else {
 		print $modx_zip .' was detected locally on the filesystem.'.PHP_EOL.PHP_EOL;
 		print 'Would you like to use that zip file? (y/n) [y] > ';
 		$yn = strtolower(trim(fgets(STDIN)));
-		if ($yn != 'y') {
+		if ($yn == 'n') {
+            print 'Downloading zip file...'.PHP_EOL;
 			download_modx($modx_zip);
 		}
 	}
 	else {
+        print 'Downloading zip file...'.PHP_EOL;
 		download_modx($modx_zip);
 	}
 	// At this point, behavior is as if we had specified the zip file verbosely.
 	$args['zip'] = $modx_zip;
 }
 
-// Prompt the user for target
-if ($args['installmode'] == 'new' && !$args['target']) {
-	$args['target'] = pathinfo($args['zip'],PATHINFO_FILENAME).DIRECTORY_SEPARATOR;
-	print PHP_EOL."Where should this be extracted? [".$args['target']."] > ";
-	$target_path = trim(fgets(STDIN));
-	if (!empty($target_path)) {
-		$args['target'] = $target_path;
-	}
+// New Intalls: Prompt user for target
+if ($args['installmode'] == 'new') {
+    if (!$args['target']) {
+    	$args['target'] = pathinfo($args['zip'],PATHINFO_FILENAME).DIRECTORY_SEPARATOR;
+    	print PHP_EOL."Where should this be extracted? [".$args['target']."] > ";
+    	$target_path = trim(fgets(STDIN));
+    	if (!empty($target_path)) {
+    		$args['target'] = $target_path;
+    	}
+    }
+    // Does the target exist?
+    if (file_exists($args['target'])) {
+        if (!is_dir($args['target'])) {
+            abort($args['target'] .' must be a directory!');
+        }
+    }
+    else {
+        @mkdir($args['target'],0777,true);
+    }
+    // make sure we have a trailing slash on the target dir
+    // REMEMBER: realpath returns false if the dir doesn't exist
+    $target = realpath($args['target']).DIRECTORY_SEPARATOR;	
+}
+// Upgrades: Prompt user for the core_path
+elseif ($args['installmode'] == 'upgrade' && !$args['core_path']) {
+    ENTERTARGET:
+	print PHP_EOL."Where is the existing MODX core directory? (absolute or relative to this script) > ";
+	$core_path = trim(fgets(STDIN));
+    if (empty($core_path)) {
+        print PHP_EOL."Input required.";
+        goto ENTERTARGET;
+    }
+    if (!file_exists($core_path)) {
+        print PHP_EOL."ERROR: directory does not exist.";
+        goto ENTERTARGET;    
+    }
+    if (!is_dir($core_path)) {
+        print PHP_EOL."ERROR: Target must be a directory.";
+        goto ENTERTARGET; 
+    }
+    $args['core_path'] = rtrim($core_path,'/').DIRECTORY_SEPARATOR;
+    // Verify that it is a MODX install?
+    if (!file_exists($args['core_path'] .'config/config.inc.php')) {
+        print PHP_EOL.'ERROR: '.$args['core_path'] .'config/config.inc.php does not exist.';
+        goto ENTERTARGET; 
+    }
+
 }
 
 // Did we actually get the zip file?
 if (!filesize($args['zip'])) {
-    abort($args['zip'] . ' is an empty file. Did you specify a valid version?');
+    abort($args['zip'] . ' is an empty file. Did you specify a valid version? Or did the download fail?');
 }
 
-
-// Does the target exist?
-if (file_exists($args['target'])) {
-    if (!is_dir($args['target'])) {
-        abort($args['target'] .' must be a directory!');
-    }
-}
-else {
-    @mkdir($args['target'],0777,true);
-}
-// make sure we have a trailing slash on the target dir
-// REMEMBER: realpath returns false if the dir doesn't exist
-$target = realpath($args['target']).DIRECTORY_SEPARATOR;
 
 // Get ourselves a random dir we can unzip to. This dir will be the src dir for the copy operation
 $tmpdir = 'tmp_modx_'.substr(md5('installmodx'.time()),-5);
@@ -837,6 +901,12 @@ $data = array();
 // We use the same XML body, so we have null out the placeholders
 if ($args['installmode'] == 'upgrade') {
     include $args['core_path'] .'config/config.inc.php';
+    if (!isset($database_type) || !isset($database_server) || !isset($dbase)
+        || !isset($database_user) || !isset($database_password) || !isset($database_connection_charset)
+        || !isset($table_prefix)) {
+        print 'FATAL ERROR: '.$args['core_path'] .'config/config.inc.php is not a valid MODX config file.';
+        teardown();
+    }
 	$data['database_type'] = $database_type;
 	$data['database_server'] = $database_server;
 	$data['database'] = $dbase;
@@ -848,7 +918,7 @@ if ($args['installmode'] == 'upgrade') {
 	$data['cmsadmin'] = '';
 	$data['cmsadminemail'] = '';
 	$data['cmspassword'] = '';
-	$data['core_path'] = $args['core_path'];
+	$data['core_path'] = MODX_CORE_PATH; // get the official path
     $data['base_url'] = MODX_BASE_URL;
 	$data['mgr_url'] = MODX_MANAGER_URL;
 	$data['connectors_url'] = MODX_CONNECTORS_URL;    
@@ -899,7 +969,8 @@ elseif (!$args['config']) {
     // Anything that needs to appear in the XML file but that you don't want
     // to prompt the user about should appear down here.
     // Some Sanitization/validation
-    $data['core_path'] = $target.basename($data['core_path']).DIRECTORY_SEPARATOR;
+//    $data['core_path'] = $target.basename($data['core_path']).DIRECTORY_SEPARATOR;
+    $data['core_path'] = rel_to_abspath($target, $data['core_path']);
     $base_url = basename($data['base_url']);    
     if (empty($base_url)) {
         $data['base_url'] = '/';
@@ -966,13 +1037,14 @@ else {
 
 }
 
+print 'Extracting zip file.'.PHP_EOL;
 // Extract the zip to a our temporary src dir
 // extract_zip needs the target to have a trailing slash!
 extract_zip($args['zip'],$src.DIRECTORY_SEPARATOR,false);
 // Move into position 
 // (both src and dest. target dirs must NOT contain trailing slash)
 recursive_copy($src.'/connectors', $target.basename($data['connectors_path']));
-recursive_copy($src.'/core', $target.basename($data['core_path']));
+recursive_copy($src.'/core', rtrim($data['core_path'],DIRECTORY_SEPARATOR)); // <-- special since it doesn't have to be in docroot
 recursive_copy($src.'/manager', $target.basename($data['mgr_path']));
 recursive_copy($src.'/setup', $target.'setup');
 recursive_copy($src.'/index.php', $target.'index.php');
