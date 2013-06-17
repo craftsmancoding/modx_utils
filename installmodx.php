@@ -30,7 +30,9 @@
  *
  * Download this script to your server (preferably to a location above your web root).  You
  * can copy and paste, or you can use a utility like wget, e.g.
- *      https://raw.github.com/craftsmancoding/modx_utils/master/installmodx.php
+ *
+ *      wget https://raw.github.com/craftsmancoding/modx_utils/master/installmodx.php
+ *
  * Then run the script via the command line, e.g.
  *
  * 		php installmodx.php
