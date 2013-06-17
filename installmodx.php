@@ -27,6 +27,12 @@
  *  --core_path : req'd if you are doing an upgrade.
  *
  * SAMPLE USAGE:
+ *
+ * Download this script to your server (preferably to a location above your web root).  You
+ * can copy and paste, or you can use a utility like wget, e.g.
+ *      https://raw.github.com/craftsmancoding/modx_utils/master/installmodx.php
+ * Then run the script via the command line, e.g.
+ *
  * 		php installmodx.php
  * 		php installmodx.php --config=myconfig.php
  * 		php installmodx.php --zip=modx-2.2.8-pl.zip
