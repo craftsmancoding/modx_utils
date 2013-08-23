@@ -86,8 +86,6 @@ define('DIR_PERMS', 0777); // for cache, etc.
 // see http://www.tuxradar.com/practicalphp/16/1/1
 ignore_user_abort(true);
 set_time_limit(0);
-$sessiondir = 'tmp_sess'; // .substr(md5('installmodx'.time()),-5);
-@mkdir($sessiondir,0777,true);
 //------------------------------------------------------------------------------
 //! Functions
 //------------------------------------------------------------------------------
@@ -193,9 +191,6 @@ function preflight() {
 	if (!ini_get('date.timezone')) {
 		abort("You must set the date.timezone setting in your php.ini. Please set it to a proper timezone before proceeding.");
 	}
-	// Session dir
-	session_save_path($sessiondir);
-	ini_set('session.use_cookies', 0);
 }
 
 /** 
@@ -761,13 +756,11 @@ function prepare_modx_upgrade($data) {
  * For clean breaks
  */
 function teardown() {
-    global $src, $target, $sessiondir;
+    global $src, $target;
     print "Cleaning up $src". PHP_EOL;
     rrmdir($src);
     print "Cleaning up $target".'setup'. PHP_EOL;
     rrmdir($target.'setup');
-    print "Cleaning up $sessiondir";
-    rrmdir($sessiondir);
     exit;
 }
 
@@ -776,7 +769,6 @@ function teardown() {
 //------------------------------------------------------------------------------
 $src = '';
 $target = '';
-$sessiondir = '';
 // Each spot in the array is a "frame" in our spinner animation
 $cursorArray = array('/','-','\\','|','/','-','\\','|'); 
 $i = 0; // for spinner iterations
@@ -963,14 +955,9 @@ elseif (!$args['config']) {
     
 	// Put anything here that you want to prompt the user about.
 	// If you include a value, that value will be used as the default.
-	$data['database_type'] = 'mysql';
-	$data['database_server'] = 'localhost';
 	$data['database'] = '';
 	$data['database_user'] = '';
 	$data['database_password'] = '';
-    $data['database_charset'] = 'utf8';
-	$data['database_collation'] = 'utf8_general_ci';
-	$data['table_prefix'] = 'modx_';
 
 	$data['core_path'] = 'core';
 
@@ -995,6 +982,12 @@ elseif (!$args['config']) {
 	}
     // Anything that needs to appear in the XML file but that you don't want
     // to prompt the user about should appear down here.
+	$data['database_type'] = 'mysql';
+	$data['database_server'] = 'localhost';
+    $data['database_charset'] = 'utf8';
+	$data['database_collation'] = 'utf8_general_ci';
+	$data['table_prefix'] = 'modx_';
+
     // Some Sanitization/validation
 //    $data['core_path'] = $target.basename($data['core_path']).DIRECTORY_SEPARATOR;
     $data['core_path'] = rel_to_abspath($target, $data['core_path']);
@@ -1096,6 +1089,8 @@ else {
     prepare_modx_new($data);
 }
 
+rrmdir($src); // lose the zip dir
+
 //------------------------------------------------------------------------------
 // ! Run Setup
 //------------------------------------------------------------------------------
@@ -1108,13 +1103,18 @@ if ($args['installmode'] == 'new') {
     print 'Installing MODX...'.PHP_EOL.PHP_EOL;
     $argv[1] = '--installmode=new';
     $argv[2] = '--core_path='.$data['core_path'];
+    `php -d error_reporting=0 {$target}setup/index.php --installmode=new --core_path={$data['core_path']}`;
 }
 elseif ($args['installmode'] == 'upgrade') {
     print 'Updating MODX...'.PHP_EOL.PHP_EOL;
     $argv[1] = '--installmode=upgrade';
     $argv[2] = '--core_path='.$data['core_path'];
+    `php -d error_reporting=0 {$target}setup/index.php --installmode=upgrade --core_path={$data['core_path']}`;
 }
-@include $target.'setup/index.php';
+
+// We can't just do this, otherwise setup will kill execution and we never get to teardown.
+// @include $target.'setup/index.php';
+
 
 print PHP_EOL;
 print 'You may now log into your MODX installation.'.PHP_EOL;
