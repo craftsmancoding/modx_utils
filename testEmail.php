@@ -23,14 +23,14 @@
  *
  * http://craftsmancoding.com/
  */
-
-$to = $modx->getOption('to',$scriptProperties);
-$from = $modx->getOption('from',$scriptProperties, $modx->getOption('emailsender'));
-$fromname = $modx->getOption('fromname',$scriptProperties, $modx->getOption('site_name'));
-$replyto = $modx->getOption('replyto',$scriptProperties, $modx->getOption('emailsender'));
-$subject = $modx->getOption('subject',$scriptProperties, 'Test Email Functionality');
-$service = $modx->getOption('service',$scriptProperties, 'mail.modPHPMailer');
-$html = $modx->getOption('html',$scriptProperties, true);
+$p = array(); // properties
+$p['to'] = $modx->getOption('to',$scriptProperties);
+$p['from'] = $modx->getOption('from',$scriptProperties, $modx->getOption('emailsender'));
+$p['fromname'] = $modx->getOption('fromname',$scriptProperties, $modx->getOption('site_name'));
+$p['replyto'] = $modx->getOption('replyto',$scriptProperties, $modx->getOption('emailsender'));
+$p['subject'] = $modx->getOption('subject',$scriptProperties, 'Test Email Functionality');
+$p['service'] = $modx->getOption('service',$scriptProperties, 'mail.modPHPMailer');
+$p['html'] = $modx->getOption('html',$scriptProperties, true);
 $msg = $modx->getOption('msg',$scriptProperties, 'This is a test email from the testEmail Snippet on the [[++site_name]] website. It was sent from [[+from]] to [[+to]].');
 
 
@@ -42,38 +42,44 @@ $successTpl = '<div style="margin:10px; padding:20px; border:1px solid green; ba
 		<span style="color:green; font-weight:bold;">Success!</span>
 		<p>%s</p></div>';
 
-if (empty($to)) {
+if (empty($p['to'])) {
     return sprintf($errorTpl,'[testEmail]: The &to parameter is required.');
 }
 
 // Our informational Chunk
+$settings = array('emailsender','allow_multiple_emails','mail_smtp_auth','mail_smtp_helo','mail_smtp_hosts','mail_smtp_keepalive'
+,'mail_smtp_pass','mail_smtp_port','mail_smtp_prefix','mail_smtp_single_to','mail_smtp_timeout','mail_smtp_user','mail_use_smtp');
+$modx->getService('lexicon','modLexicon');
+$modx->lexicon->load('core');
+
+$rows = '';
+foreach ($settings as $s) {
+    $rows .= sprintf('<tr><td><strong>%s</strong></td><td>[[++%s]]</td><td><em>%s</em></td></tr>',$s,$s,$modx->lexicon('setting_'.$s.'_desc'));
+}
+
 $infoTpl = '
 <div style="margin:10px; padding:20px; border:1px solid gray; border-radius: 5px; width:500px;">
 <h3>Script Properties</h3>
 <pre>'.
-print_r($scriptProperties,true)
+print_r($p,true)
 .'</pre>
 <h3>Email Related System Settings</h3>
-<strong>emailsender:</strong> [[++email_sender]] <em>([[%setting_email_sender_desc]])</em><br/>
-<strong>allow_multiple_emails</strong> [[++allow_multiple_emails]] <em>([[%setting_allow_multiple_emails_desc]])</em><br/>
-<strong>mail_smtp_auth</strong> [[++mail_smtp_auth]] <em>([[%setting_mail_smtp_auth_desc]])</em><br/>
-<strong>mail_smtp_helo</strong> [[++mail_smtp_helo]] <em>([[%setting_mail_smtp_helo_desc]])</em><br/>
-<strong>mail_smtp_hosts</strong> [[++mail_smtp_hosts]] <em>([[%setting_mail_smtp_hosts_desc]])</em><br/>
-<strong>mail_smtp_keepalive</strong> [[++mail_smtp_keepalive]]<em>([[%setting_mail_smtp_keepalive_desc]])</em><br/>
-<strong>mail_smtp_pass</strong> [[++mail_smtp_pass]]<em>([[%setting_mail_smtp_pass_desc]])</em><br/>
-<strong>mail_smtp_port</strong> [[++mail_smtp_port]]<em>([[%setting_mail_smtp_port_desc]])</em><br/>
-<strong>mail_smtp_prefix</strong> [[++mail_smtp_prefix]]<em>([[%setting_mail_smtp_prefix_desc]])</em><br/>
-<strong>mail_smtp_single_to</strong> [[++mail_smtp_single_to]]<em>([[%setting_mail_smtp_single_to_desc]])</em><br/>
-<strong>mail_smtp_timeout</strong> [[++mail_smtp_timeout]]<em>([[%setting_mail_smtp_timeout_desc]])</em><br/>
-<strong>mail_smtp_user</strong> [[++mail_smtp_user]]<em>([[%setting_mail_smtp_user_desc]])</em><br/>
-<strong>mail_use_smtp</strong> [[++mail_use_smtp]]<em>([[%setting_mail_use_smtp_desc]])</em><br/>
-
+<table>
+    <thead>
+        <tr>
+            <th>System Setting</th><th>Value</th><th>Description</th>
+        </tr>
+    </thead>
+    <tbody>'
+        .$rows
+        .'
+    </tbody>
+</table>
 
 <h3>See Also</h3>
 <p>
-    <li>
-        <a href="http://rtfm.modx.com/revolution/2.x/developing-in-modx/advanced-development/modx-services/modmail">MODX modMail</a>
-    </li>
+    <li><a href="http://rtfm.modx.com/revolution/2.x/developing-in-modx/advanced-development/modx-services/modmail">MODX modMail</a></li>
+    <li><a href="https://support.google.com/mail/answer/1366858?hl=en&ctx=mail&expand=5">Why messages are marked as Spam</a></li>
 </p>
 </div>';
 
@@ -81,17 +87,17 @@ print_r($scriptProperties,true)
 $uniqid = uniqid();
 $chunk = $modx->newObject('modChunk', array('name' => "{tmp}-{$uniqid}"));
 $chunk->setCacheable(false);
-$msg = $chunk->process($scriptProperties, $msg);
+$msg = $chunk->process($p, $msg);
 
 
-$modx->getService('mail', $service);
+$modx->getService('mail', $p['service']);
 $modx->mail->set(modMail::MAIL_BODY, $msg);
-$modx->mail->set(modMail::MAIL_FROM, $from);
-$modx->mail->set(modMail::MAIL_FROM_NAME, $fromname);
-$modx->mail->set(modMail::MAIL_SUBJECT, $subject);
-$modx->mail->address('to', $to);
-$modx->mail->address('reply-to', $replyto);
-$modx->mail->setHTML($html);
+$modx->mail->set(modMail::MAIL_FROM, $p['from']);
+$modx->mail->set(modMail::MAIL_FROM_NAME, $p['fromname']);
+$modx->mail->set(modMail::MAIL_SUBJECT, $p['subject']);
+$modx->mail->address('to', $p['to']);
+$modx->mail->address('reply-to', $p['replyto']);
+$modx->mail->setHTML($p['html']);
 if (!$modx->mail->send()) {
     return sprintf($errorTpl,'An error occurred while trying to send the email: ' . $modx->mail->mailer->ErrorInfo);
 }
@@ -104,7 +110,7 @@ $chunk = $modx->newObject('modChunk', array('name' => "{tmp}-{$uniqid}"));
 $chunk->setCacheable(false);
 $output = $chunk->process($scriptProperties, $infoTpl);
 
-$output = sprintf($successTpl,'[testEmail]: We think your email went out correctly.  This is no guarantee of success, but we did not see any obvious errors at the system level.  Check to see if the message was delivered!') . $output;
+$output = sprintf($successTpl,'[testEmail]: We think your email went out correctly.  This is no guarantee of success, but we did not see any obvious errors at the system level.  Check to see if the message was delivered, and be sure to check your Spam filters.') . $output;
 return $output;
 
 /*EOF*/
