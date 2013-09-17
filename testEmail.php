@@ -49,12 +49,10 @@ if (empty($p['to'])) {
 // Our informational Chunk
 $settings = array('emailsender','allow_multiple_emails','mail_smtp_auth','mail_smtp_helo','mail_smtp_hosts','mail_smtp_keepalive'
 ,'mail_smtp_pass','mail_smtp_port','mail_smtp_prefix','mail_smtp_single_to','mail_smtp_timeout','mail_smtp_user','mail_use_smtp');
-$modx->getService('lexicon','modLexicon');
-$modx->lexicon->load('core');
 
 $rows = '';
 foreach ($settings as $s) {
-    $rows .= sprintf('<tr><td><strong>%s</strong></td><td>[[++%s]]</td><td><em>%s</em></td></tr>',$s,$s,$modx->lexicon('setting_'.$s.'_desc'));
+    $rows .= sprintf('<tr><td><strong>%s</strong></td><td>[[++%s]]</td><td><em>[[!%s? &topic=`setting` &namespace=`core` &language=`en`]]</em></td></tr>',$s,$s,'%setting_'.$s.'_desc');
 }
 
 $infoTpl = '
