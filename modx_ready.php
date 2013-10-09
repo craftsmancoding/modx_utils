@@ -2,6 +2,11 @@
 /**
  * SUMMARY:
  * This script tests whether a server is capable of running MODX.
+ * It is NOT conclusive, but it should help narrow things down for you.
+ * Sometimes MODX fails when the script says things are Ok, and sometimes
+ * MODX works fine when the script indicates there may be a problem. 
+ * Take the results with a grain of salt.
+ *
  * See http://rtfm.modx.com/display/revolution20/Server+Requirements
  *
  * USAGE:
@@ -16,7 +21,7 @@
  * http://craftsmancoding.com/
  *
  * LAST UPDATED: 
- * 2013-03-10 MODX 2.2.6
+ * 2013-10-09 MODX 2.2.10
  */
 
 //------------------------------------------------------------------------------
@@ -24,6 +29,7 @@
 //------------------------------------------------------------------------------
 $req_min_php_version = '5.1.2';
 $req_ext = array('zlib','json','gd','PDO','pdo_mysql','curl','SimpleXML','mysql');
+$req_functions = array('mb_strpos');
 
 function print_errors($e) {
 	$error_list = implode('<br/>',$e);
@@ -95,6 +101,13 @@ $ram = ini_get('memory_limit');
 $ram = preg_replace('/[^0-9]/', '', $ram); 
 if ($ram < 24) {
     $errors[] = 'MODX requires at least 24M of memory.';
+}
+
+// Test for req'd functions
+foreach ($req_functions as $f) {
+    if (!function_exists($f)) {
+        $errors[] = sprintf('MODX requires the %s function', '<code>'.$e.'</code>');
+    }
 }
 
 // Summary
