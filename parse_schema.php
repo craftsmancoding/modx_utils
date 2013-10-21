@@ -21,13 +21,19 @@ $package_name = '';
 // Set this to false if you've started to customize the PHP classes, otherwise
 // your changes will be overwritten!
 $regenerate_classes = true;
- 
+
+// Set this if you want your package to use table prefixes different than MODX
+$my_table_prefix = '';
  
 //------------------------------------------------------------------------------
 //  DO NOT TOUCH BELOW THIS LINE
 //------------------------------------------------------------------------------
 require_once 'config.core.php';
- 
+
+if (empty($my_table_prefix)) {
+	$my_table_prefix = $table_prefix; // default MODX prefix
+}
+
 if (!defined('MODX_CORE_PATH')) {
     print_msg('<h1>Parsing Error</h1>
         <p>MODX_CORE_PATH not defined! Did you include the correct config file?</p>');
@@ -104,7 +110,7 @@ if ($regenerate_classes) {
     delete_class_files($mysql_class_dir);
 }
  
-$generator->parseSchema($xml_schema_file,$model_dir);
+$generator->parseSchema($xml_schema_file,$model_dir,$my_table_prefix);
  
  
 $mtime= microtime();
