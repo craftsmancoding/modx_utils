@@ -156,7 +156,7 @@ switch ($args['class_name']) {
     case 'modResource':
         for ($i=1; $i <= $args['count'] ; $i++) { 
             $content = array();
-            generate_lorem($content, 2);
+            generate_lorem($content, 150);
             $pagetitle = preg_split('/[\s,]+/', $content, 3);
             //remove 3rd Item
             array_pop($pagetitle);
