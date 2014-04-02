@@ -33,7 +33,7 @@
 *     php firehose.php --remove --class_name=modUser
 *
 * Available extra parameters for modResource : --parent,--template, --published, --hide_menu
-* Available extra parameters for modResource : --password,--active, --email
+* Available extra parameters for modUser : --password,--active, --email
 *
 * AUTHOR:
 * Daniel Edano (daniel@craftsmancoding.com)
