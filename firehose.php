@@ -8,6 +8,7 @@
 *  --class_name which type of object are we creating. Default: modResource
 *  --count how many objects should be created? Default: 10
 *  --remove remove firehose records
+*  You can use other Object Field as a parameter like --published==1 or --hidemenu=1 or --longtitle="Sample Long Title"
 *
 * SAMPLE USAGE:
 *
@@ -32,8 +33,6 @@
 *
 *     php firehose.php --remove --class_name=modUser
 *
-* Available extra parameters for modResource : --parent,--template, --published, --hide_menu
-* Available extra parameters for modUser : --password,--active, --email
 *
 * AUTHOR:
 * Daniel Edano (daniel@craftsmancoding.com)
@@ -152,29 +151,21 @@ if($args['count'] == 0 || $args['count'] > 200) {
 
 // perform action for specific class name
 switch ($args['class_name']) {
-    // Create is different because the directory doesn't exist yet
     case 'modResource':
-        for ($i=1; $i <= $args['count'] ; $i++) { 
-            $content = array();
-            generate_lorem($content, 150);
+        for ($i=1; $i <= $args['count'] ; $i++) {    
+            $obj = $modx->newObject('modResource');
+            // set modx fields from cli args
+            set_fields(parse_args($argv),$obj);
+
+            // set/overrides main fields
+            $content = generate_lorem(150);
             $pagetitle = preg_split('/[\s,]+/', $content, 3);
             //remove 3rd Item
             array_pop($pagetitle);
-            $published = find_field('published',$argv);
-            $hidemenu = find_field('hidemenu',$argv);
-            $template = find_field('template',$argv);
-            $parent = find_field('parent',$argv);
-
-            $obj = $modx->newObject('modResource');
             $obj->set('pagetitle', "Firehose_$i " . ucwords(implode(' ', $pagetitle)) );
             $obj->set('alias', "Firehose_$i-" .implode('-', $pagetitle) );
             $obj->set('content', ucfirst($content) );
-            $obj->set('published', !is_null($published) ? $published : 1 );
-            $obj->set('hidemenu', !is_null($hidemenu) ? $hidemenu : 1 );
-            $obj->set('template', !is_null($template) ? $template : 0 );
-            $obj->set('parent', !is_null($parent) ? $parent : 0 );
 
-            $obj->save();
             if (!$obj->save()) {
                 print message("Failed to add a Record",'ERROR');
                 die();
@@ -184,23 +175,19 @@ switch ($args['class_name']) {
         die();
         break;
     case 'modUser' : 
-         for ($i=1; $i <= $args['count'] ; $i++) { 
-            $username = array();
-            generate_lorem($username, 2);
-            $username = "Firehose_$i-".str_replace(' ', '_', $username);
-            $active = find_field('active',$argv);
-            $password = find_field('password',$argv);
-            $email = find_field('email',$argv);
+         for ($i=1; $i <= $args['count'] ; $i++) {
+            $username = "Firehose_$i-".str_replace(' ', '_', generate_lorem(2));
 
             $user = $modx->newObject('modUser');
             $profile = $modx->newObject('modUserProfile');
 
+            set_fields(parse_args($argv),$user);
+            set_fields(parse_args($argv),$profile);
+            // force a value
             $user->set('username',$username);
-            $user->set('active',!is_null($active) ? $active : 1 );
-            $user->set('password', !is_null($password) ? $password : $username );
-
-            $profile->set('email', !is_null($email) ? $email : 'test@test.com' );
+            $user->set('password',$username );
             $profile->set('internalKey',0);
+
             $user->addOne($profile,'Profile');
 
             // save user
@@ -213,13 +200,14 @@ switch ($args['class_name']) {
         break;
     case 'modChunk':
         for ($i=1; $i <= $args['count'] ; $i++) { 
-            $chunk = array();
-            generate_lorem($chunk, 50);
+            $chunk = generate_lorem(50);
             $name = preg_split('/[\s,]+/', $chunk, 3);
             //remove 3rd Item
             array_pop($name);
 
             $ch = $modx->newObject('modChunk');
+
+            set_fields(parse_args($argv),$ch);
             $ch->set('name', "Firehose_$i" . str_replace(' ', '_', implode(' ', $name)) );
             $ch->set('snippet', '<p>'.ucfirst($chunk).'</p>' );
 
@@ -234,18 +222,18 @@ switch ($args['class_name']) {
         break;
     case 'modSnippet':
         for ($i=1; $i <= $args['count'] ; $i++) { 
-            $snippet = array();
-            generate_lorem($snippet, 20);
-            $name = preg_split('/[\s,]+/', $snippet, 3);
+            $snippet_name = generate_lorem(20);
+            $name = preg_split('/[\s,]+/', $snippet_name, 3);
             //remove 3rd Item
             array_pop($name);
 
-            $ch = $modx->newObject('modSnippet');
-            $ch->set('name', "Firehose_$i" . str_replace(' ', '_', implode(' ', $name)) );
-            $ch->set('snippet', 'echo '."'".ucfirst($snippet)."';" );
+            $snippet = $modx->newObject('modSnippet');
+            set_fields(parse_args($argv),$snippet);
+            $snippet->set('name', "Firehose_$i" . str_replace(' ', '_', implode(' ', $name)) );
+            $snippet->set('snippet', 'esnippeto '."'".ucfirst($snippet_name)."';" );
 
-            $ch->save();
-            if (!$ch->save()) {
+            $snippet->save();
+            if (!$snippet->save()) {
                 print message("Failed to add a Snippet",'ERROR');
                 die();
             }
@@ -255,18 +243,19 @@ switch ($args['class_name']) {
         break;
     case 'modPlugin':
         for ($i=1; $i <= $args['count'] ; $i++) { 
-            $snippet = array();
-            generate_lorem($snippet, 20);
-            $name = preg_split('/[\s,]+/', $snippet, 3);
+            $plugin_code = array();
+            generate_lorem($plugin_code, 20);
+            $name = preg_split('/[\s,]+/', $plugin_code, 3);
             //remove 3rd Item
             array_pop($name);
 
-            $ch = $modx->newObject('modPlugin');
-            $ch->set('name', "Firehose_$i" . str_replace(' ', '_', implode(' ', $name)) );
-            $ch->set('plugincode', 'echo '."'".ucfirst($snippet)."';" );
+            $plugin = $modx->newObject('modPlugin');
+            set_fields(parse_args($argv),$plugin);
+            $plugin->set('name', "Firehose_$i" . str_replace(' ', '_', implode(' ', $name)) );
+            $plugin->set('plugincode', 'echo '."'".ucfirst($plugin_code)."';" );
 
-            $ch->save();
-            if (!$ch->save()) {
+            $plugin->save();
+            if (!$plugin->save()) {
                 print message("Failed to add a Plugin",'ERROR');
                 die();
             }
@@ -335,13 +324,13 @@ function filter_records($class_name,$field='pagetitle') {
 }
 
 /**
-* generate_lorem
-* generate random string from the array $words
-* @param array $arr
+* generate_lorem : generate random length of words
 * @param int count
+* @return string random words
 **/
-function generate_lorem(&$arr,$count)
+function generate_lorem($count)
 {
+    $random_words = array();
     $words = array('lorem','ipsum','dolor','sit','amet','consectetur','adipiscing','elit','curabitur','vel','hendrerit','libero','eleifend','blandit','nunc','ornare','odio','ut','orci','gravida','imperdiet','nullam','purus','lacinia','a','pretium','quis','congue','praesent','sagittis','laoreet','auctor','mauris','non','velit','eros','dictum','proin','accumsan','sapien','nec','massa','volutpat','venenatis','sed','eu','molestie','lacus','quisque','porttitor','ligula','dui','mollis','tempus','at','magna','vestibulum','turpis','ac','diam','tincidunt','id','condimentum','enim','sodales','in','hac','habitasse','platea','dictumst','aenean','neque','fusce','augue','leo','eget','semper','mattis','tortor','scelerisque','nulla','interdum','tellus','malesuada','rhoncus','porta','sem','aliquet','et','nam','suspendisse','potenti','vivamus','luctus','fringilla','erat','donec','justo','vehicula','ultricies','varius','ante','primis','faucibus','ultrices','posuere','cubilia','curae','etiam','cursus','aliquam','quam','dapibus',
         'nisl','feugiat','egestas','class','aptent','taciti','sociosqu','ad','litora','torquent','per','conubia','nostra','inceptos','himenaeos','phasellus','nibh','pulvinar','vitae','urna','iaculis','lobortis','nisi','viverra','arcu','morbi','pellentesque','metus','commodo','ut','facilisis','felis','tristique','ullamcorper','placerat','aenean','convallis','sollicitudin','integer','rutrum','duis','est','etiam','bibendum','donec','pharetra','vulputate','maecenas','mi','fermentum','consequat','suscipit','aliquam','habitant','senectus','netus','fames','quisque','euismod','curabitur','lectus','elementum','tempor','risus','cras' );
 
@@ -353,27 +342,46 @@ function generate_lorem(&$arr,$count)
         $word = $words[$index];
         //echo $index . '=>' . $word . '<br />';
         
-        if($i > 0 && $arr[$i - 1] == $word)
+        if($i > 0 && $random_words[$i - 1] == $word)
             $i--;
         else
-            $arr[$i] = $word;
+            $random_words[$i] = $word;
     }
-    $arr = implode(' ', $arr);
+    return  implode(' ', $random_words);
 }
 
 
-function find_field($field,$argv) {
-    if(empty($field)) {
-        return null;
-    }
-    for($i=0; $i < count($argv); $i++)
-    {
-        if (strpos($argv[$i],$field) !== false) {
-           $result = explode('=', $argv[$i]);
-           return $result[1];
+/**
+* parse_args function : parse arguments used from command line
+* remove --
+* @param array $argv
+* @return array $data : multi array with possible modx field and value
+***/
+function parse_args($argv){
+    $data = array();
+    foreach ($argv as $key => $value) {
+        if (strpos($value,'--') !== false) {
+            $value = str_replace('--', '', $value);
+            $data[] = explode('=', $value);    
         }
-            
     }
+    return $data;
+}
+
+
+/**
+* Reusable function
+* set_fields : Set modx fields using the parsed arguments from cli
+* @param array $data : parsed_args
+* @param obj $obj : modx obj
+**/
+function set_fields($data,$obj) {
+   if(empty($data)) {
+        return;
+   }
+   foreach ($data as $field) {
+        $obj->set($field[0], isset($field[1]) ? $field[1] : '');
+   }
 }
 
 /**
@@ -422,9 +430,8 @@ php ".basename(__FILE__)." --remove --class_name=modUser
 ----------------------------------------------
 EXTRA Parameters
 ----------------------------------------------
-* Available extra parameters for modResource : --parent,--template, --published, --hide_menu
-* Available extra parameters for modResource : --password,--active, --email
-
+* You can use other Object Field as a parameter like --published==1 or --hidemenu=1 or --longtitle=Sample Long Title
+*
 ";
 }
 
