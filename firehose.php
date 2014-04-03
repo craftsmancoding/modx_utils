@@ -38,7 +38,6 @@
 * Daniel Edano (daniel@craftsmancoding.com)
 *
 **/
-
 if (php_sapi_name() !== 'cli') {
     error_log('Firehose CLI script can only be executed from the command line.');
     die('CLI access only.');
@@ -155,7 +154,7 @@ switch ($args['class_name']) {
         for ($i=1; $i <= $args['count'] ; $i++) {    
             $obj = $modx->newObject('modResource');
             // set modx fields from cli args
-            set_fields(parse_args($argv),$obj);
+            $obj->fromArray(parse_args($argv));
 
             // set/overrides main fields
             $pagetitle = "Firehose_$i " .generate_lorem(3);
@@ -178,8 +177,9 @@ switch ($args['class_name']) {
             $user = $modx->newObject('modUser');
             $profile = $modx->newObject('modUserProfile');
 
-            set_fields(parse_args($argv),$user);
-            set_fields(parse_args($argv),$profile);
+            $profile->set('email','test@test.com');
+            $user->fromArray(parse_args($argv));
+            $profile->fromArray(parse_args($argv));
             // force a value
             $user->set('username',$username);
             $user->set('password',$username );
@@ -199,7 +199,7 @@ switch ($args['class_name']) {
         for ($i=1; $i <= $args['count'] ; $i++) {
             $ch = $modx->newObject('modChunk');
 
-            set_fields(parse_args($argv),$ch);
+            $ch->fromArray(parse_args($argv));
             $ch->set('name', "Firehose_$i" . str_replace(' ', '_', generate_lorem(2)));
             $ch->set('snippet', '<p>'.ucfirst(generate_lorem(50)).'</p>' );
 
@@ -215,7 +215,8 @@ switch ($args['class_name']) {
     case 'modSnippet':
         for ($i=1; $i <= $args['count'] ; $i++) { 
             $snippet = $modx->newObject('modSnippet');
-            set_fields(parse_args($argv),$snippet);
+
+            $snippet->fromArray(parse_args($argv));
             $snippet->set('name', "Firehose_$i" . str_replace(' ', '_', generate_lorem(2)) );
             $snippet->set('snippet', 'echo '."'".ucfirst(generate_lorem(20))."';" );
 
@@ -231,7 +232,8 @@ switch ($args['class_name']) {
     case 'modPlugin':
         for ($i=1; $i <= $args['count'] ; $i++) { 
             $plugin = $modx->newObject('modPlugin');
-            set_fields(parse_args($argv),$plugin);
+            
+            $plugin->fromArray(parse_args($argv));
             $plugin->set('name', "Firehose_$i" . str_replace(' ', '_', generate_lorem(2)) );
             $plugin->set('plugincode', 'echo '."'".ucfirst(generate_lorem(20))."';" );
 
@@ -331,38 +333,28 @@ function generate_lorem($count)
     return  implode(' ', $random_words);
 }
 
-
 /**
-* parse_args function : parse arguments used from command line
-* remove --
-* @param array $argv
-* @return array $data : multi array with possible modx field and value
-***/
-function parse_args($argv){
-    $data = array();
-    foreach ($argv as $key => $value) {
-        if (strpos($value,'--') !== false) {
-            $value = str_replace('--', '', $value);
-            $data[] = explode('=', $value);    
+ * Parse command line arguments
+ *
+ * @param array $args
+ * @return array
+ */
+function parse_args($args) {
+    $overrides = array();
+    foreach($args as $a) {
+        if (substr($a,0,2) == '--') {
+            if ($equals_sign = strpos($a,'=',2)) {
+                $key = substr($a, 2, $equals_sign-2);
+                $val = substr($a, $equals_sign+1);
+                $overrides[$key] = $val;
+            }
+            else {
+                $flag = substr($a, 2);
+                $overrides[$flag] = true;
+            }
         }
-    }
-    return $data;
-}
-
-
-/**
-* Reusable function
-* set_fields : Set modx fields using the parsed arguments from cli
-* @param array $data : parsed_args
-* @param obj $obj : modx obj
-**/
-function set_fields($data,$obj) {
-   if(empty($data)) {
-        return;
-   }
-   foreach ($data as $field) {
-        $obj->set($field[0], isset($field[1]) ? $field[1] : '');
-   }
+    }   
+    return $overrides;
 }
 
 /**
