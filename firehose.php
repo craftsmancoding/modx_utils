@@ -158,13 +158,10 @@ switch ($args['class_name']) {
             set_fields(parse_args($argv),$obj);
 
             // set/overrides main fields
-            $content = generate_lorem(150);
-            $pagetitle = preg_split('/[\s,]+/', $content, 3);
-            //remove 3rd Item
-            array_pop($pagetitle);
-            $obj->set('pagetitle', "Firehose_$i " . ucwords(implode(' ', $pagetitle)) );
-            $obj->set('alias', "Firehose_$i-" .implode('-', $pagetitle) );
-            $obj->set('content', ucfirst($content) );
+            $pagetitle = "Firehose_$i " .generate_lorem(3);
+            $obj->set( 'pagetitle', ucwords($pagetitle) );
+            $obj->set('alias', str_replace(' ', '', $pagetitle));
+            $obj->set('content', ucfirst(generate_lorem(150)) );
 
             if (!$obj->save()) {
                 print message("Failed to add a Record",'ERROR');
@@ -199,17 +196,12 @@ switch ($args['class_name']) {
         print message("Sample Users were Successfully Created.",'SUCCESS');
         break;
     case 'modChunk':
-        for ($i=1; $i <= $args['count'] ; $i++) { 
-            $chunk = generate_lorem(50);
-            $name = preg_split('/[\s,]+/', $chunk, 3);
-            //remove 3rd Item
-            array_pop($name);
-
+        for ($i=1; $i <= $args['count'] ; $i++) {
             $ch = $modx->newObject('modChunk');
 
             set_fields(parse_args($argv),$ch);
-            $ch->set('name', "Firehose_$i" . str_replace(' ', '_', implode(' ', $name)) );
-            $ch->set('snippet', '<p>'.ucfirst($chunk).'</p>' );
+            $ch->set('name', "Firehose_$i" . str_replace(' ', '_', generate_lorem(2)));
+            $ch->set('snippet', '<p>'.ucfirst(generate_lorem(50)).'</p>' );
 
             $ch->save();
             if (!$ch->save()) {
@@ -222,15 +214,10 @@ switch ($args['class_name']) {
         break;
     case 'modSnippet':
         for ($i=1; $i <= $args['count'] ; $i++) { 
-            $snippet_name = generate_lorem(20);
-            $name = preg_split('/[\s,]+/', $snippet_name, 3);
-            //remove 3rd Item
-            array_pop($name);
-
             $snippet = $modx->newObject('modSnippet');
             set_fields(parse_args($argv),$snippet);
-            $snippet->set('name', "Firehose_$i" . str_replace(' ', '_', implode(' ', $name)) );
-            $snippet->set('snippet', 'esnippeto '."'".ucfirst($snippet_name)."';" );
+            $snippet->set('name', "Firehose_$i" . str_replace(' ', '_', generate_lorem(2)) );
+            $snippet->set('snippet', 'echo '."'".ucfirst(generate_lorem(20))."';" );
 
             $snippet->save();
             if (!$snippet->save()) {
@@ -243,16 +230,10 @@ switch ($args['class_name']) {
         break;
     case 'modPlugin':
         for ($i=1; $i <= $args['count'] ; $i++) { 
-            $plugin_code = array();
-            generate_lorem($plugin_code, 20);
-            $name = preg_split('/[\s,]+/', $plugin_code, 3);
-            //remove 3rd Item
-            array_pop($name);
-
             $plugin = $modx->newObject('modPlugin');
             set_fields(parse_args($argv),$plugin);
-            $plugin->set('name', "Firehose_$i" . str_replace(' ', '_', implode(' ', $name)) );
-            $plugin->set('plugincode', 'echo '."'".ucfirst($plugin_code)."';" );
+            $plugin->set('name', "Firehose_$i" . str_replace(' ', '_', generate_lorem(2)) );
+            $plugin->set('plugincode', 'echo '."'".ucfirst(generate_lorem(20))."';" );
 
             $plugin->save();
             if (!$plugin->save()) {
