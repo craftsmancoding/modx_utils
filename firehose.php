@@ -266,10 +266,10 @@ function message($text, $status) {
 $args = parse_args($argv);
 
 // overrides args by defaults
-$remove = !isset($args['remove']) ? false : true;
-if(!isset($args['classname']) || $args['classname'] == 1 && $remove == true) {
+$remove = !isset($args['remove']) ? 0 : 1;
+if(!isset($args['classname']) && $remove == 1) {
     $classname = '';
-} elseif(isset($args['classname']) && $remove == true) {
+} elseif(isset($args['classname']) && $remove == 1) {
     $classname = $args['classname'];
 } else {
     $classname = 'modResource';
