@@ -218,7 +218,7 @@ function show_help() {
     ----------------------------------------------
     EXTRA Parameters
     ----------------------------------------------
-    * You can use other Object Field as a parameter like --published==1 or --hidemenu=1 or --longtitle=Sample Long Title
+    * You can use other Object Field as a parameter like --published==1 or --hidemenu=1 or --longtitle='Sample Long Title'
     *
     ";
 }
