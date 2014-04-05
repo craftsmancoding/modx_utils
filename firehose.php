@@ -44,29 +44,63 @@ if (php_sapi_name() !== 'cli') {
     die('CLI access only.');
 }
 
+$supported_classnames = array('modResource'=>'pagetitle','modUser'=>'username','modChunk'=>'name','modPlugin'=>'name','modSnippet'=>'name');
+
 /**
- * Parse command line arguments
- *
- * @param array $args
- * @return array
+ * Add records to the database
+ * @param array $args 
  */
-function parse_args($args) {
-    $overrides = array();
-    foreach($args as $a) {
-        if (substr($a,0,2) == '--') {
-            if ($equals_sign = strpos($a,'=',2)) {
-                $key = substr($a, 2, $equals_sign-2);
-                $val = substr($a, $equals_sign+1);
-                $overrides[$key] = $val;
-            }
-            else {
-                $flag = substr($a, 2);
-                $overrides[$flag] = true;
-            }
+function add_records($args) {
+    global $modx;
+
+    for ($i=1; $i <= $args['count'] ; $i++) {  
+        $obj = $modx->newObject($args['classname']);
+        $obj->fromArray($args);
+
+        switch ($args['classname']) {
+            case 'modResource':
+                // Set the things that need to be unique
+                // and the things that must be set.
+                $pagetitle = "Firehose_".uniqid();
+                $obj->set('pagetitle', $pagetitle);
+                $obj->set('alias', $pagetitle);
+                $obj->set('content', ucfirst(generate_lorem(150)));
+                break;
+            case 'modChunk' :
+                $obj->set('name', "Firehose_".uniqid());
+                $obj->set('snippet', '<p>'.ucfirst(generate_lorem(50)).'</p>');
+                break;
+            case 'modSnippet':
+                $obj->set('name', "Firehose_".uniqid());
+                $obj->set('snippet', 'echo '."'".ucfirst(generate_lorem(20))."';");
+                break;
+            case 'modPlugin':
+                $obj->set('name', "Firehose_".uniqid());
+                $obj->set('plugincode', 'echo '."'".ucfirst(generate_lorem(20))."';");
+                break;
+            case 'modUser'  :
+                $username = "Firehose_".uniqid();
+                $profile = $modx->newObject('modUserProfile');
+
+                $profile->set('email','test@test.com');
+                $profile->fromArray($args);
+
+                // force a value
+                $obj->set('username',$username);
+                $obj->set('password',$username );
+                $profile->set('internalKey',0);
+
+                $obj->addOne($profile,'Profile');
+                break;
         }
-    }   
-    return $overrides;
+
+        if (!$obj->save()) {
+            print message("Failed to add a {$args['classname']} Record",'ERROR');
+            // do not die here!  Keep going!
+        }
+    }
 }
+
 
 /**
  * Query modx records using class name and field
@@ -115,6 +149,121 @@ function generate_lorem($count) {
 }
 
 /**
+ * Colorize text for cleaner CLI UX. 
+ * TODO: Windows compatible?
+ *
+ * Adapted from 
+ * http://softkube.com/blog/generating-command-line-colors-with-php/
+ * http://www.if-not-true-then-false.com/2010/php-class-for-coloring-php-command-line-cli-scripts-output-php-output-colorizing-using-bash-shell-colors/
+ * 
+ * @param string $text
+ * @param string $status
+ * @return string
+ */
+function message($text, $status) {
+    $out = '';
+    switch($status) {
+        case 'SUCCESS':
+            $out = '[42m SUCCESS: '.chr(27).'[0;32m '; //Green background
+            break;
+        case 'ERROR':
+            $out = '[41m ERROR: '. chr(27).'[0;31m '; //Red
+            break;
+        case 'WARNING':
+            $out = '[43m WARNING: '; //Yellow background
+            break;
+        case 'INFO':
+            $out = '[46m NOTE: '. chr(27).'[0;34m '; //Blue
+            break;
+        case 'HEADER':
+            $out = '[46m '; //Blue            
+            break;
+        case 'HELP':
+            $out = '[46m HELP: '. chr(27).'[0;34m '; //Blue
+            break;
+        default:
+            throw new Exception('Invalid status: ' . $status);
+    }
+    return "\n".chr(27) . $out . $text .' '. chr(27) . '[0m'."\n\n";
+}
+
+
+/**
+ * Parse command line arguments
+ * Set params default
+ * @param array $args
+ * @return array
+ */
+function parse_args($args) {
+    $overrides = array();
+    foreach($args as $a) {
+        if (substr($a,0,2) == '--') {
+            if ($equals_sign = strpos($a,'=',2)) {
+                $key = substr($a, 2, $equals_sign-2);
+                $val = substr($a, $equals_sign+1);
+                $overrides[$key] = $val;
+            }
+            else {
+                $flag = substr($a, 2);
+                $overrides[$flag] = true;
+            }
+        }
+    }   
+
+    $overrides['remove'] = !isset($overrides['remove']) ? 0 : 1;
+    if(!isset($overrides['classname']) && $overrides['remove'] == 1) {
+        $overrides['classname'] = '';
+    } elseif(isset($overrides['classname']) && $overrides['remove'] == 1) {
+        $overrides['classname'] = $overrides['classname'];
+    } elseif(isset($overrides['classname'])) {
+        $overrides['classname'] = $overrides['classname'];
+    } else {
+        $overrides['classname'] = 'modResource';
+    }
+
+    $overrides['count'] = !isset($overrides['count']) ? 10 : (int) $overrides['count'];
+    return $overrides;
+}
+
+
+/**
+ * Remove records from the database
+ * @param string $classname
+ */
+function remove_records($classname) {
+
+    global $modx;
+    global $supported_classnames;
+
+    // Default is to delete all records that firehose added
+    // but if classname is set, then we only remove records from that table
+    print 'Are you sure you want to delete all Firehose Records? (y/n) [n] > ';
+    $yn = strtolower(trim(fgets(STDIN)));
+    if ($yn!='y') {
+        die();
+    }
+    if (!empty($classname) && array_key_exists($classname, $supported_classnames)) {
+        $supported_classnames = array($classname=>$supported_classnames[$classname]); 
+    }
+    
+    foreach ($supported_classnames as $classname => $field) {
+        $c = $modx->newQuery($classname);
+        $c->where(array(
+           "$field:LIKE" => 'Firehose_%',
+        ));
+        $collection = $modx->getIterator($classname,$c);
+        foreach ($collection as $obj) {
+            if ($obj->remove() == false) {
+                print message("Failed to delete a {$classname} Record with field ".$obj->get($field),'ERROR');
+            }
+        }
+        print message("Sample {$classname} were Successfully Deleted.",'SUCCESS');
+    }
+    die();
+}
+
+
+/**
  * save object base on specified classname
  * this will also merge custom_attrs set via cli and developers default attrs
  *
@@ -139,37 +288,6 @@ function save_obj($argv,$default_attrs=array(),$classname) {
         }
     }
 
-}
-
-/**
- * remove sample firehose records
- *
- * @param string $classname
- */
-function remove_records($classname) {
-    print 'Are you sure you want to delete all Firehose Records? (y/n) [n] > ';
-    $yn = strtolower(trim(fgets(STDIN)));
-    if ($yn!='y') {
-        die();
-    }
-    $classes = array('modResource'=>'pagetitle','modUser'=>'username','modChunk'=>'name','modPlugin'=>'name','modSnippet'=>'name');
-    if (!empty($classname) && array_key_exists($classname, $classes)) {
-        $classes = array($classname=>$classes[$classname]); 
-    }
-    foreach ($classes as $c => $query_str) {
-        $records = filter_records($c,$query_str);
-        if (count($records) !== 0) {
-            foreach ($records as $r) {
-                if ($r->remove() == false) {
-                    print message("Failed to delete a {$c} Record",'ERROR');
-                    die();
-                }
-            }
-        };
-        
-        print message("Sample {$c} were Successfully Deleted.",'SUCCESS');
-    }
-    die();
 }
 
 /**
@@ -223,62 +341,6 @@ function show_help() {
     ";
 }
 
-/**
- * Colorize text for cleaner CLI UX. 
- * TODO: Windows compatible?
- *
- * Adapted from 
- * http://softkube.com/blog/generating-command-line-colors-with-php/
- * http://www.if-not-true-then-false.com/2010/php-class-for-coloring-php-command-line-cli-scripts-output-php-output-colorizing-using-bash-shell-colors/
- * 
- * @param string $text
- * @param string $status
- * @return string
- */
-function message($text, $status) {
-    $out = '';
-    switch($status) {
-        case 'SUCCESS':
-            $out = '[42m SUCCESS: '.chr(27).'[0;32m '; //Green background
-            break;
-        case 'ERROR':
-            $out = '[41m ERROR: '. chr(27).'[0;31m '; //Red
-            break;
-        case 'WARNING':
-            $out = '[43m WARNING: '; //Yellow background
-            break;
-        case 'INFO':
-            $out = '[46m NOTE: '. chr(27).'[0;34m '; //Blue
-            break;
-        case 'HEADER':
-            $out = '[46m '; //Blue            
-            break;
-        case 'HELP':
-            $out = '[46m HELP: '. chr(27).'[0;34m '; //Blue
-            break;
-        default:
-            throw new Exception('Invalid status: ' . $status);
-    }
-    return "\n".chr(27) . $out . $text .' '. chr(27) . '[0m'."\n\n";
-}
-
-// get args from cli
-$args = parse_args($argv);
-
-// overrides args by defaults
-$remove = !isset($args['remove']) ? 0 : 1;
-if(!isset($args['classname']) && $remove == 1) {
-    $classname = '';
-} elseif(isset($args['classname']) && $remove == 1) {
-    $classname = $args['classname'];
-} else {
-    $classname = 'modResource';
-}
-
-$count = !isset($args['count']) ? 10 : (int) $args['count'];
-
-
-
 // Find MODX...
 
 // As long as this script is built placed inside a MODX docroot, this will sniff out
@@ -326,113 +388,25 @@ require_once MODX_CORE_PATH.'model/modx/modx.class.php';
 $modx = new modX();
 $modx->initialize('mgr');
 
-// if count is 0 exit
-if($count == 0 || $count > 200) {
-     print message("No Records Affected. COUNT Error",'ERROR');
+// get args from cli
+$params = parse_args($argv);
+
+// Validate the args, e.g.
+if($params['count'] == 0 || $params['count'] > 200) {
+     print message("--count must be > 0 or <= 200",'ERROR');
      die();
 }
-
-
-// perform action for specific class name
-switch ($classname) {
-    case 'modResource':
-       
-        if($remove) {
-           remove_records('modResource'); 
-        }
-        
-        for ($i=1; $i <= $count ; $i++) {  
-
-            $pagetitle = "Firehose_".uniqid();
-            $default_attrs = array(
-                'pagetitle' => $pagetitle,
-                'alias' =>  $pagetitle,
-                'content'   => ucfirst(generate_lorem(150))
-            );
-            save_obj($argv, $default_attrs,'modResource');            
-        }
-        break;
-    case 'modUser' : 
-
-        if($remove) {
-           remove_records('modUser'); 
-        }
-
-         for ($i=1; $i <= $count ; $i++) {
-            $username = "Firehose_".uniqid();
-
-            $user = $modx->newObject('modUser');
-            $profile = $modx->newObject('modUserProfile');
-
-            $profile->set('email','test@test.com');
-
-            $attrs = parse_args($argv);
-            $user->fromArray($attrs);
-            $profile->fromArray($attrs);
-
-            // force a value
-            $user->set('username',$username);
-            $user->set('password',$username );
-            $profile->set('internalKey',0);
-
-            $user->addOne($profile,'Profile');
-
-            // save user
-            if (!$user->save()) {
-                print message("Failed to add a User",'ERROR');
-                die();
-            }
-
-        }
-        break;
-    case 'modChunk':
-
-        if($remove) {
-           remove_records('modChunk'); 
-        }
-
-        for ($i=1; $i <= $count ; $i++) {
-            $default_attrs = array(
-                'name' => "Firehose_".uniqid(),
-                'snippet' =>  '<p>'.ucfirst(generate_lorem(50)).'</p>'
-            );
-            save_obj($argv, $default_attrs,'modChunk');
-        }
-        break;
-    case 'modSnippet':
-
-        if($remove) {
-           remove_records('modSnippet'); 
-        }
-
-        for ($i=1; $i <= $count ; $i++) { 
-            $default_attrs = array(
-                'name' => "Firehose_".uniqid(),
-                'snippet' =>  'echo '."'".ucfirst(generate_lorem(20))."';"
-            );
-            save_obj($argv, $default_attrs,'modSnippet');
-        }
-        break;
-    case 'modPlugin':
-
-        if($remove) {
-           remove_records('modPlugin'); 
-        }
-
-        for ($i=1; $i <= $count ; $i++) { 
-            $default_attrs = array(
-                'name' => "Firehose_".uniqid(),
-                'plugincode' =>  'echo '."'".ucfirst(generate_lorem(20))."';"
-            );
-            save_obj($argv, $default_attrs,'modPlugin');
-        }
-        break;
-    case '':
-        remove_records(); 
-        break;
-    default:
-        print message('Unsupported Class Name','ERROR');
-        die();
+if ( !in_array( $params['classname'], array_keys( $supported_classnames) ) && $params['classname'] !== '') {
+    print message("Unsupported classname.",'ERROR');
+    die();
 }
 
-print message("{$count} {$classname} records Created.",'SUCCESS');
+
+// do the action
+if ($params['remove']) {
+    remove_records($params['classname']);
+}
+else {
+    add_records($params);
+    print message("{$params['count']} {$params['classname']} records Created.",'SUCCESS');
+}
