@@ -15,15 +15,12 @@
  *
  * AUTHOR:
  * Daniel Edano (daniel@craftsmancoding.com)
- *
  */
-
 // This can only be run via cli
 if (php_sapi_name() !== 'cli') {
     error_log('Firehose CLI script can only be executed from the command line.');
     die('CLI access only.');
 }
-
 $supported_classnames = array('modResource'=>'pagetitle','modUser'=>'username','modChunk'=>'name','modPlugin'=>'name','modSnippet'=>'name');
 
 /**
@@ -31,13 +28,10 @@ $supported_classnames = array('modResource'=>'pagetitle','modUser'=>'username','
  * @param array $args 
  */
 function add_records($args) {
-
     global $modx;
-
     for ($i=1; $i <= $args['count'] ; $i++) {  
         $obj = $modx->newObject($args['classname']);
         $obj->fromArray($args);
-
         switch ($args['classname']) {
             case 'modResource':
                 // Set the things that need to be unique
@@ -74,7 +68,6 @@ function add_records($args) {
                 $obj->addOne($profile,'Profile');
                 break;
         }
-
         if (!$obj->save()) {
             print message("Failed to add a {$args['classname']} Record",'ERROR');
         }
@@ -92,11 +85,8 @@ function generate_lorem($count) {
     $random_words = array();
     $words = array('lorem','ipsum','dolor','sit','amet','consectetur','adipiscing','elit','curabitur','vel','hendrerit','libero','eleifend','blandit','nunc','ornare','odio','ut','orci','gravida','imperdiet','nullam','purus','lacinia','a','pretium','quis','congue','praesent','sagittis','laoreet','auctor','mauris','non','velit','eros','dictum','proin','accumsan','sapien','nec','massa','volutpat','venenatis','sed','eu','molestie','lacus','quisque','porttitor','ligula','dui','mollis','tempus','at','magna','vestibulum','turpis','ac','diam','tincidunt','id','condimentum','enim','sodales','in','hac','habitasse','platea','dictumst','aenean','neque','fusce','augue','leo','eget','semper','mattis','tortor','scelerisque','nulla','interdum','tellus','malesuada','rhoncus','porta','sem','aliquet','et','nam','suspendisse','potenti','vivamus','luctus','fringilla','erat','donec','justo','vehicula','ultricies','varius','ante','primis','faucibus','ultrices','posuere','cubilia','curae','etiam','cursus','aliquam','quam','dapibus',
         'nisl','feugiat','egestas','class','aptent','taciti','sociosqu','ad','litora','torquent','per','conubia','nostra','inceptos','himenaeos','phasellus','nibh','pulvinar','vitae','urna','iaculis','lobortis','nisi','viverra','arcu','morbi','pellentesque','metus','commodo','ut','facilisis','felis','tristique','ullamcorper','placerat','aenean','convallis','sollicitudin','integer','rutrum','duis','est','etiam','bibendum','donec','pharetra','vulputate','maecenas','mi','fermentum','consequat','suscipit','aliquam','habitant','senectus','netus','fames','quisque','euismod','curabitur','lectus','elementum','tempor','risus','cras' );
-
-    $i = 0;
-    
-    for($i; $i < $count; $i++)
-    {
+    $i = 0;    
+    for($i; $i < $count; $i++) {
         $index = array_rand($words);
         $word = $words[$index];
         //echo $index . '=>' . $word . '<br />';
@@ -148,7 +138,6 @@ function message($text, $status) {
     return "\n".chr(27) . $out . $text .' '. chr(27) . '[0m'."\n\n";
 }
 
-
 /**
  * Parse command line arguments and set defaults.
  *
@@ -180,14 +169,12 @@ function parse_args($args) {
     return $defaults;
 }
 
-
 /**
  * Remove records from the database
  * @param string $classname
  * @return integer count of the removed items
  */
 function remove_records($classname) {
-
     global $modx;
     global $supported_classnames;
 
