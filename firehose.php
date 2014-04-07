@@ -1,44 +1,17 @@
 <?php
 /**
- *  Firehose via CLI 
- *  Quickly create objects for modx
- *  Supported class names : modResource, modUser, modChunk, modSnippet, modPlugin
+ * Firehose 
+ * Quickly create objects for modx Revolution via the CLI.
+ * Supported class names : modResource, modUser, modChunk, modSnippet, modPlugin
  *
- *  PARAMETERS
- *  --class_name which type of object are we creating. Default: modResource
- *  --count how many objects should be created? Default: 10
- *  --remove remove firehose records
- *  You can use other Object Field as a parameter like --published==1 or --hidemenu=1 or --longtitle="Sample Long Title"
- *
- * SAMPLE USAGE:
- *
- * Run the script via the command line.  The simplest invocation is to just run the 
- * script without any options: this will create 10 records for modResource Class
- *
- * 		php firehose.php
- *
- * You can supply options when you run the script
- *  
- *      php firehose.php --classname=modUser
- *
- * To set count of objects to be created, LIMIT is 200 records
- *
- *      php firehose.php --count=100
- *
- * To Delete Firehose records, will delete all firehose records
- *
- *     php firehose.php --remove
- *
- * To Delete Firehose records of specific classname
- *
- *     php firehose.php --remove --classname=modUser
+ * See --help for usage.
  *
  * AUTHOR:
  * Daniel Edano (daniel@craftsmancoding.com)
  *
  */
 
-// Avoid running this script on browser, this can only be run via cli
+// This can only be run via cli
 if (php_sapi_name() !== 'cli') {
     error_log('Firehose CLI script can only be executed from the command line.');
     die('CLI access only.');
@@ -51,6 +24,7 @@ $supported_classnames = array('modResource'=>'pagetitle','modUser'=>'username','
  * @param array $args 
  */
 function add_records($args) {
+
     global $modx;
 
     for ($i=1; $i <= $args['count'] ; $i++) {  
@@ -96,30 +70,10 @@ function add_records($args) {
 
         if (!$obj->save()) {
             print message("Failed to add a {$args['classname']} Record",'ERROR');
-            // do not die here!  Keep going!
         }
     }
 }
 
-
-/**
- * Query modx records using class name and field
- *
- * @param string $classname
- * @param string $field
- * @return empty array or $object
- */
-function filter_records($classname,$field='pagetitle') {
-    global $modx;
-    if(empty($classname)) {
-        return array();
-    }
-    $c = $modx->newQuery($classname);
-    $c->where(array(
-       "$field:LIKE" => 'Firehose_%',
-    ));
-    return $modx->getCollection($classname,$c);
-}
 
 /**
  * generate random length of words
@@ -158,7 +112,7 @@ function generate_lorem($count) {
  * 
  * @param string $text
  * @param string $status
- * @return string
+ * @return string message formatted for CLI
  */
 function message($text, $status) {
     $out = '';
@@ -179,7 +133,7 @@ function message($text, $status) {
             $out = '[46m '; //Blue            
             break;
         case 'HELP':
-            $out = '[46m HELP: '. chr(27).'[0;34m '; //Blue
+            $out = '[42m HELP: '. chr(27).'[0;32m '; //Green
             break;
         default:
             throw new Exception('Invalid status: ' . $status);
@@ -189,46 +143,41 @@ function message($text, $status) {
 
 
 /**
- * Parse command line arguments
- * Set params default
+ * Parse command line arguments and set defaults.
+ *
  * @param array $args
  * @return array
  */
 function parse_args($args) {
-    $overrides = array();
+    $defaults = array(
+        'count' => 10,
+        'remove' => false,
+        'classname' => '',
+        'help' => false,
+    );
     foreach($args as $a) {
         if (substr($a,0,2) == '--') {
             if ($equals_sign = strpos($a,'=',2)) {
                 $key = substr($a, 2, $equals_sign-2);
                 $val = substr($a, $equals_sign+1);
-                $overrides[$key] = $val;
+                $defaults[$key] = $val;
             }
             else {
                 $flag = substr($a, 2);
-                $overrides[$flag] = true;
+                $defaults[$flag] = true;
             }
         }
     }   
-
-    $overrides['remove'] = !isset($overrides['remove']) ? 0 : 1;
-    if(!isset($overrides['classname']) && $overrides['remove'] == 1) {
-        $overrides['classname'] = '';
-    } elseif(isset($overrides['classname']) && $overrides['remove'] == 1) {
-        $overrides['classname'] = $overrides['classname'];
-    } elseif(isset($overrides['classname'])) {
-        $overrides['classname'] = $overrides['classname'];
-    } else {
-        $overrides['classname'] = 'modResource';
-    }
-
-    $overrides['count'] = !isset($overrides['count']) ? 10 : (int) $overrides['count'];
-    return $overrides;
+    
+    $defaults['count'] = (int) $defaults['count']; // enforce integer
+    return $defaults;
 }
 
 
 /**
  * Remove records from the database
  * @param string $classname
+ * @return integer count of the removed items
  */
 function remove_records($classname) {
 
@@ -237,15 +186,10 @@ function remove_records($classname) {
 
     // Default is to delete all records that firehose added
     // but if classname is set, then we only remove records from that table
-    print 'Are you sure you want to delete all Firehose Records? (y/n) [n] > ';
-    $yn = strtolower(trim(fgets(STDIN)));
-    if ($yn!='y') {
-        die();
-    }
     if (!empty($classname) && array_key_exists($classname, $supported_classnames)) {
         $supported_classnames = array($classname=>$supported_classnames[$classname]); 
     }
-    
+    $cnt = 0;
     foreach ($supported_classnames as $classname => $field) {
         $c = $modx->newQuery($classname);
         $c->where(array(
@@ -256,99 +200,52 @@ function remove_records($classname) {
             if ($obj->remove() == false) {
                 print message("Failed to delete a {$classname} Record with field ".$obj->get($field),'ERROR');
             }
+            $cnt++;
         }
-        print message("Sample {$classname} were Successfully Deleted.",'SUCCESS');
     }
-    die();
-}
-
-
-/**
- * save object base on specified classname
- * this will also merge custom_attrs set via cli and developers default attrs
- *
- * @param array $argv
- * @param array $default_attrs
- * @param string $classname
- */
-function save_obj($argv,$default_attrs=array(),$classname) {
-    global $modx;
-    // get extra attrs from cli
-    $custom_attrs = parse_args($argv);
-    // merge attrs, overrides custom by defaults
-    $attrs = array_merge($custom_attrs, $default_attrs);
     
-    if(!empty($classname)) {
-        $obj = $modx->newObject($classname);
-        $obj->fromArray($attrs);
-
-        if (!$obj->save()) {
-            print message("Failed to add a {$classname} Record",'ERROR');
-            die();
-        }
-    }
-
+    return $cnt;
 }
 
+
 /**
- * display help on cli
+ * display help message
  */
 function show_help() {
 
-    print "
-    ----------------------------------------------
-    Firehose via CLI 
-    ----------------------------------------------
-    This Utility Quickly create objects for modx 
-    Supported class name : modResource, modUser, modChunk, modSnippet, modPlugin
-    ----------------------------------------------
-    PARAMETERS:
-    ----------------------------------------------
-    --classname which type of object are we creating. Default: modResource
-    --count how many objects should be created? Default: 10
-    --remove remove firehose records
-    --help : displays this help page.
+    print message('Firehose','HELP');
+    print "Command line utility for quickly adding lots of sample records to MODX Revolution.
+    
+".message('PARAMETERS:','HEADER')."
+ --classname    Identify the type of object to create or delete. Required for insert operations.
+                Supported class names: modResource, modUser, modChunk, modSnippet, modPlugin
+ --count        how many objects should be created? (Default: 10)
+ --remove       remove all records created with firehose. Specify --classname to restrict deletion.
+ --help         displays this help page.
+ ...more...     When adding records, you may specify any non-reserved object attribute relevant to 
+                the classname being created.  E.g. --template for modResource or --category for modSnippet.
+".message('USAGE EXAMPLES:','HEADER').
+"Create 1000 pages:
+    php ".basename(__FILE__)." --modResource --count=1000
 
-    ----------------------------------------------
-    USAGE EXAMPLES:
-    * Run the script via the command line.
-    ----------------------------------------------
-    php ".basename(__FILE__)."
+Create 10 users:
+    php ".basename(__FILE__)." --modUser --count=10
 
-        The simplest invocation is to just run the script without any options: this will create 10 records for modResource Class
+Specify extra parameters to create pages that are unpublished children of page 3
+    php ".basename(__FILE__)." --modResource --published=0 --parent=3
 
-    php ".basename(__FILE__)." --classname=modUser
-
-        You can supply --classname option when you run the script
-
-    php ".basename(__FILE__)." --count=100
-
-        --count set count of objects to be created, LIMIT is 200 records
-
+Cleanup all records created by firehose:
     php ".basename(__FILE__)." --remove
 
-        Use --remove to Delete Firehose records, will delete all firehose records
+Remove only modChunk records created by firehose:
+    php ".basename(__FILE__)." --remove --classname=modChunk
 
-    php ".basename(__FILE__)." --remove --classname=modUser
-
-        To Delete Firehose records of specific classname, add --classname
-
-    ----------------------------------------------
-    EXTRA Parameters
-    ----------------------------------------------
-    * You can use other Object Field as a parameter like --published==1 or --hidemenu=1 or --longtitle='Sample Long Title'
-    *
-    ";
+";
 }
-
-// Find MODX...
-
-// As long as this script is built placed inside a MODX docroot, this will sniff out
-// a valid MODX_CORE_PATH.  This will effectively force the MODX_CONFIG_KEY too.
-// The config key controls which config file will be loaded. 
-// Syntax: {$config_key}.inc.php
-// 99.9% of the time this will be "config", but it's useful when dealing with
-// dev/prod pushes to have a config.inc.php and a prod.inc.php, stg.inc.php etc.
+//------------------------------------------------------------------------------
+//! MAIN BLOCK
+//------------------------------------------------------------------------------
+// Find MODX: as long this script is inside a MODX webroot, it will run.
 $dir = '';
 if (!defined('MODX_CORE_PATH') && !defined('MODX_CONFIG_KEY')) {
     $max = 10;
@@ -391,22 +288,31 @@ $modx->initialize('mgr');
 // get args from cli
 $params = parse_args($argv);
 
-// Validate the args, e.g.
-if($params['count'] == 0 || $params['count'] > 200) {
-     print message("--count must be > 0 or <= 200",'ERROR');
+if ($params['help']) {
+    show_help();
+    exit;
+}
+
+// Validate the args:
+if($params['count'] <= 0) {
+     print message("--count must be greater than 0",'ERROR');
      die();
 }
-if ( !in_array( $params['classname'], array_keys( $supported_classnames) ) && $params['classname'] !== '') {
+if (!$params['remove'] && !$params['classname']) {
+     print message("--classname is required for insert operations.",'ERROR');
+     die();    
+}
+if ($params['classname'] && !in_array( $params['classname'], array_keys($supported_classnames))) {
     print message("Unsupported classname.",'ERROR');
     die();
 }
 
-
 // do the action
 if ($params['remove']) {
-    remove_records($params['classname']);
+    $cnt = remove_records($params['classname']);
+    print message("$cnt records removed.",'SUCCESS');
 }
 else {
     add_records($params);
-    print message("{$params['count']} {$params['classname']} records Created.",'SUCCESS');
+    print message("{$params['count']} {$params['classname']} records created.",'SUCCESS');
 }
