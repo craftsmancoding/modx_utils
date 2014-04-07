@@ -4,6 +4,13 @@
  * Quickly create objects for modx Revolution via the CLI.
  * Supported class names : modResource, modUser, modChunk, modSnippet, modPlugin
  *
+ * INSTALLATION:
+ * Copy this file in its entirety somewhere into the webroot of your MODX Revo site.
+ * Alternatively, use wget to download the file directly from github:
+ *
+ *  wget https://raw.githubusercontent.com/craftsmancoding/modx_utils/master/firehose.php
+ *
+ * USAGE:
  * See --help for usage.
  *
  * AUTHOR:
