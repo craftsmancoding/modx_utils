@@ -240,21 +240,32 @@ if ($params['debug']) {
 }
 // see http://www.webhostingtalk.com/showthread.php?t=1043707
 // http://www.webdeveloper.com/forum/showthread.php?208676-Remote-site-loading-time
+print "STARTING ".date('Y-m-d H:i:s'). "\n";
 $mtime = explode(" ", microtime());
 $tstart = $mtime[1] + $mtime[0];
-
+$pg_cnt=0;
+$e_cnt=0;
 $collection = $modx->getIterator('modResource',$c);
 foreach ($collection as $obj) {
     $url = $modx->makeUrl($obj->get('id'),'','','full');
+    if (!$url) {
+        print 'ERROR empty URL for page '.$obj->get('id')."\n";
+        continue;
+    }
     if (!$loadtime = request_url($url)) {
         print 'ERROR requesting '.$url."\n";
+        $e_cnt++;
     }
     else {
         print $url . ' Load Time: '.$loadtime."s\n";
+        $pg_cnt++;
     }
     wait($params['sleep']);
 }
 
 $totalTime = ($tend - $tstart);
 $totalTime = sprintf("%2.4f s", $totalTime);
-print "COMPLETE: Total Time ".$totalTime."s\n"; // seconds
+print "COMPLETE ".date('Y-m-d H:i:s'). "\n";
+print "Total Time ".$totalTime."s\n"; // seconds
+print "Total pages: ".$pg_cnt."\n";
+print "Total errors: ".$e_cnt."\n";
