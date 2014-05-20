@@ -73,18 +73,14 @@ $dbase          = '';       // name of your database
 $database_user      = '';       // name of the user
 $database_password  = '';   // password for that database user
  
-// if this file is not placed side by side with the config.core.php file, add the directory path
-include_once 'config.core.php';
-// OR, use your MODx Revo connection details.  Just uncomment the next line:
-//include(MODX_CORE_PATH . 'config/' . MODX_CONFIG_KEY . '.inc.php');
- 
 // If your tables use a prefix, this will help identify them and it ensures that
 // the class names appear "clean", without the prefix.
-$table_prefix = '';
+$table_prefix = 'axpr_';
+
 // If you specify a table prefix, you probably want this set to 'true'. E.g. if you
 // have custom tables alongside the modx_xxx tables, restricting the prefix ensures
 // that you only generate classes/maps for the tables identified by the $table_prefix.
-$restrict_prefix = false;
+$restrict_prefix = true;
  
  
  
@@ -92,6 +88,18 @@ $restrict_prefix = false;
 //------------------------------------------------------------------------------
 //  DO NOT TOUCH BELOW THIS LINE
 //------------------------------------------------------------------------------
+$docroot = dirname(__FILE__);
+while (!file_exists($docroot.'/config.core.php')) {
+    if ($docroot == '/') {
+        die('Failed to locate config.core.php');
+    }
+    $docroot = dirname($docroot);
+}
+if (!file_exists($docroot.'/config.core.php')) {
+    die('Failed to locate config.core.php');
+}
+require_once $docroot.'/config.core.php';
+
 if (!defined('MODX_CORE_PATH')) {
     print_msg('<h1>Reverse Engineering Error</h1>
         <p>MODX_CORE_PATH not defined! Did you include the correct config file?</p>');
@@ -99,7 +107,7 @@ if (!defined('MODX_CORE_PATH')) {
 }
  
 $xpdo_path = strtr(MODX_CORE_PATH . 'xpdo/xpdo.class.php', '\\', '/');
-include_once ( $xpdo_path );
+include_once  $xpdo_path ;
  
 // A few definitions of files/folders:
 $package_dir = MODX_CORE_PATH . "components/$package_name/";

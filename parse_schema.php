@@ -28,7 +28,18 @@ $my_table_prefix = '';
 //------------------------------------------------------------------------------
 //  DO NOT TOUCH BELOW THIS LINE
 //------------------------------------------------------------------------------
-require_once 'config.core.php';
+$docroot = dirname(__FILE__);
+while (!file_exists($docroot.'/config.core.php')) {
+    if ($docroot == '/') {
+        die('Failed to locate config.core.php');
+    }
+    $docroot = dirname($docroot);
+}
+if (!file_exists($docroot.'/config.core.php')) {
+    die('Failed to locate config.core.php');
+}
+require_once $docroot.'/config.core.php';
+
 
 if (empty($my_table_prefix)) {
 	$my_table_prefix = $table_prefix; // default MODX prefix
