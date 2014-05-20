@@ -59,7 +59,7 @@ foreach ($argv as $s) {
         continue;
     }
     echo "Submitting $s\n";    
-    continue;
+
     //Google
     $url = "http://www.google.com/webmasters/sitemaps/ping?sitemap=".$s;
     $returnCode = myCurl($url);
