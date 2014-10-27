@@ -15,6 +15,7 @@
  *
  * AUTHOR:
  * Daniel Edano (daniel@craftsmancoding.com)
+ * Everett Griffiths (everett@craftsmancoding.com)
  */
 // This can only be run via cli
 if (php_sapi_name() !== 'cli') {
@@ -109,6 +110,7 @@ function generate_lorem($count) {
  * 
  * @param string $text
  * @param string $status
+ * @throws Exception
  * @return string message formatted for CLI
  */
 function message($text, $status) {
@@ -220,13 +222,13 @@ function show_help() {
                 the classname being created.  E.g. --template for modResource or --category for modSnippet.
 ".message('USAGE EXAMPLES:','HEADER').
 "Create 1000 pages:
-    php ".basename(__FILE__)." --modResource --count=1000
+    php ".basename(__FILE__)." --classname=modResource --count=1000
 
 Create 10 users:
-    php ".basename(__FILE__)." --modUser --count=10
+    php ".basename(__FILE__)." --classname=modUser --count=10
 
 Specify extra parameters to create pages that are unpublished children of page 3
-    php ".basename(__FILE__)." --modResource --published=0 --parent=3
+    php ".basename(__FILE__)." --classname=modResource --published=0 --parent=3
 
 Cleanup all records created by firehose:
     php ".basename(__FILE__)." --remove
