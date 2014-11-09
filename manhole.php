@@ -166,6 +166,7 @@ pre {
                 </tr>';
         }
         $out .= '</tbody></table>';
+        // TODO: Pagination!
         return $this->header('Users') . $out . $this->footer();
     }
 
