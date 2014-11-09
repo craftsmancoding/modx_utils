@@ -271,7 +271,7 @@ if (!defined('MODX_CORE_PATH') || !defined('MODX_CONFIG_KEY')) {
 }
 
 if (!file_exists(MODX_CORE_PATH.'model/modx/modx.class.php')) {
-    print message("modx.class.php not found at ".MODX_CORE_PATH,'ERROR');
+    print message("modx.class.php not found at ".MODX_CORE_PATH.'model/modx/modx.class.php','ERROR');
     die(3);
 }
 
