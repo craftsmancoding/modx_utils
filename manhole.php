@@ -10,7 +10,7 @@ class Manhole {
 
     public function footer()
     {
-        return '</body></html>';
+        return '<div><a href="?">Back</a> | <a href="?page=create_user">Create User</a></div></body></html>';
     }
 
     public function header($title)
@@ -161,7 +161,7 @@ pre {
             $out .= '<tr>
                     <td>'.$u->get('id').'</td>
                     <td>'.$u->get('username').'</td>
-                    <td>'.$u->Profile->get('email').'</td>
+                    <td><a href="?page=edit_user&id='.$u->get('id').'">'.$u->Profile->get('email').'</a></td>
                     <td><a href="?page=login&id='.$u->get('id').'" target="_blank">Login &raquo;</a></td>
                 </tr>';
         }
@@ -211,16 +211,62 @@ pre {
 
     }
 
+    /**
+     * Edit existing user
+     * @return string
+     */
     public function edit_user()
     {
+        $id = (isset($_GET['id'])) ? $_GET['id'] : 0;
+        if (!$u = $this->modx->getObject('modUser',$id))
+        {
+            return $this->error('There was a problem retrieving the user.');
+        }
+
+        return $this->header('Edit User').'<form action="?page=update_user" method="post">
+                <input type="hidden" name="id" value="'.$u->get('id').'"/>
+                <label for="username">Username</label>
+                <input type="text" name="username" id="username" value="'.htmlspecialchars($u->get('username')).'"/><br/>
+                <label for="email">Email</label>
+                <input type="text" name="email" id="email" value="'.htmlspecialchars($u->Profile->get('email')).'"/><br/>
+                <label for="password">Password</label>
+                <input type="text" name="password" id="password" placeholder="New Password..." value=""/><br/>
+                <label for="sudo">Sudo Priv?</label>
+                <input type="checkbox" name="sudo" value="1" checked="checked"/><br/>
+                <input type="submit" value="Save User" />
+            </form>'.$this->footer();
 
     }
 
+    /**
+     * Post action
+     */
+    public function update_user()
+    {
+        return '<pre>'.print_r($_POST,true).'</pre>';
+    }
+
+    /**
+     * Create new User
+     */
     public function create_user()
     {
-
+        return $this->header('Create User').'<form action="?page=insert_user" method="post">
+                <label for="username">Username</label>
+                <input type="text" name="username" id="username" value=""/><br/>
+                <label for="email">Email</label>
+                <input type="text" name="email" id="email" value=""/><br/>
+                <label for="password">Password</label>
+                <input type="text" name="password" id="password" placeholder="Password..." value=""/><br/>
+                <label for="sudo">Sudo Priv?</label>
+                <input type="checkbox" name="sudo" value="1" checked="checked"/><br/>
+                <input type="submit" value="Create User" />
+            </form>'.$this->footer();
     }
 
+    /**
+     * Delete this file: erase tracks
+     */
     public function delete_this()
     {
 
