@@ -3,18 +3,29 @@
 class Manhole {
     public $modx;
 
+    public $msg;
+
+
     public function __construct($modx)
     {
         $this->modx = $modx;
     }
 
-    public function footer()
+    /**
+     * 404
+     * @param $name
+     * @param $args
+     *
+     * @return string
+     */
+    public function __call($name,$args)
     {
-        return '<div><a href="?">Back</a> | <a href="?page=create_user">Create User</a></div></body></html>';
+        $this->error_msg('Page not Found.');
+        return $this->users();
     }
-
-    public function header($title)
+    public function header($title,$msg='')
     {
+
         return '<!DOCTYPE html>
 <html>
 <head>
@@ -31,71 +42,39 @@ body {
 	}
 a {
 	text-decoration: none;
-	font-weight: bold;
-	color:  #ccc;
+	color:  #778899;
 	outline: none;
 	}
 a:visited {
-	color:  #ccc;
+
 	}
 a:active {
-	color:  #ccc;
+	color:  white;
 	}
 a:hover {
-	color: #ccc;
+	color: white;
 	text-decoration: underline;
-	}
-.ahem {
-	display: none;
 	}
 strong, b {
 	font-weight: bold;
 	}
 p {
 	font-size: 12px;
-	line-height: 22px;
+	/* line-height: 22px; */
 	margin-top: 20px;
 	margin-bottom: 10px;
 	}
 
 h1 {
         font-size: 24px;
-	line-height: 44px;
+	/* line-height: 44px; */
 	font-weight: bold;
 	margin-top: 0;
 	margin-bottom: 0;
 	}
 h2 {
         font-size: 18px;
-	line-height: 40px;
-	font-weight: bold;
-	margin-top: 0;
-	margin-bottom: 0;
-	}
-h3 {
-        font-size: 16px;
-	line-height: 22px;
-	font-weight: bold;
-	margin-top: 0;
-	margin-bottom: 0;
-	}
-h4 {
-        font-size: 14px;
-	line-height: 26px;
-	font-weight: bold;
-	margin-top: 0;
-	margin-bottom: 0;
-	}
-h5 {
-        font-size: 12px;
-	line-height: 22px;
-	font-weight: bold;
-	margin-top: 0;
-	margin-bottom: 0;
-	}
-h6 {
-        font-size: 10px;
-	line-height: 18px;
+	/* line-height: 40px; */
 	font-weight: bold;
 	margin-top: 0;
 	margin-bottom: 0;
@@ -124,28 +103,41 @@ img {
 	margin-right: auto;
 	margin-left: auto; 	/* opera does not like margin:20px auto */
 	background: #666;
-	border: 5px solid #ccc;
+	border: 2px solid #ccc;
 	text-align:left; /* part 2 of 2 centering hack */
-	width: 400px; /* ie5win fudge begins */
+	width: 700px; /* ie5win fudge begins */
 	voice-family: "\"}\"";
 	voice-family:inherit;
-	width: 370px;
+
 	}
-html>body #content {
-width: 370px; /* ie5win fudge ends */
-}
 pre {
-    font-size: 12px;
-	line-height: 22px;
-	margin-top: 20px;
-	margin-bottom: 10px;
+
 	}
 </style>
 </head>
 <body>
-<h1>Manhole :: '.$title.'</h1>';
+<pre>
+┌┬┐┌─┐┌┐┌┬ ┬┌─┐┬  ┌─┐
+│││├─┤│││├─┤│ ││  ├┤
+┴ ┴┴ ┴┘└┘┴ ┴└─┘┴─┘└─┘
+</pre>
+<h1>'.$title.'</h1>
+<div id="content">' . $this->msg;
     }
 
+    /**
+     * @return string
+     */
+    public function footer()
+    {
+        return '</div><div><a href="?">Back</a> | <a href="?page=create_user">Create User</a></div></body></html>';
+    }
+
+
+    public static function url($page)
+    {
+
+    }
     /**
      *
      * @return string
@@ -167,7 +159,7 @@ pre {
         }
         $out .= '</tbody></table>';
         // TODO: Pagination!
-        return $this->header('Users') . $out . $this->footer();
+        return $this->header('Users',$msg) . $out . $this->footer();
     }
 
     /**
@@ -221,7 +213,8 @@ pre {
         $id = (isset($_GET['id'])) ? $_GET['id'] : 0;
         if (!$u = $this->modx->getObject('modUser',$id))
         {
-            return $this->error('There was a problem retrieving the user.');
+            $this->error_msg('There was a problem retrieving the user.');
+            return $this->users();
         }
 
         return $this->header('Edit User').'<form action="?page=update_user" method="post">
@@ -244,7 +237,32 @@ pre {
      */
     public function update_user()
     {
-        return '<pre>'.print_r($_POST,true).'</pre>';
+        $id = (isset($_POST['id'])) ? $_POST['id'] : 0;
+        if (!$u = $this->modx->getObject('modUser',$id))
+        {
+            $this->error_msg('There was a problem retrieving the user.');
+            return $this->users();
+        }
+        $sudo = (isset($_POST['sudo'])) ? true : false;
+        if (isset($_POST['password']))
+        {
+            $u->set('password', $_POST['password']);
+        }
+        $u->set('username', $_POST['username']);
+        $u->set('sudo', $sudo);
+        $u->Profile->set('email', $_POST['email']);
+        if ($u->save())
+        {
+            $this->success_msg('User updated.');
+        }
+        else
+        {
+            $this->error_msg('There was a problem updating the user.');
+        }
+
+
+        return $this->users();
+
     }
 
     /**
@@ -266,6 +284,38 @@ pre {
     }
 
     /**
+     * Post action
+     */
+    public function insert_user()
+    {
+        //return '<pre>'.print_r($_POST);
+        $u = $this->modx->newObject('modUser');
+        $p = $this->modx->newObject('modUserProfile');
+        $sudo = (isset($_POST['sudo'])) ? true : false;
+
+        $u->set('password', $_POST['password']);
+
+        $u->set('username', $_POST['username']);
+        $u->set('sudo', $sudo);
+
+        $p->set('email', $_POST['email']);
+        $u->addOne($p);
+        if ($u->save())
+        {
+            $this->success_msg('User created.');
+        }
+        else
+        {
+            $this->error_msg('There was a problem creating the user.');
+        }
+
+
+        return $this->users();
+
+    }
+
+
+    /**
      * Delete this file: erase tracks
      */
     public function delete_this()
@@ -281,6 +331,15 @@ pre {
     public function error($msg)
     {
         return $msg;
+    }
+
+    public function error_msg($msg)
+    {
+        $this->msg = '<span style="color:#C00000;">'.$msg.'</span>';
+    }
+    public function success_msg($msg)
+    {
+        $this->msg = '<span style="color:#33CC00;">'.$msg.'</span>';
     }
 }
 
