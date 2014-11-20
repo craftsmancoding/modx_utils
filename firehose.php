@@ -32,7 +32,7 @@ function add_records($args) {
     global $modx;
     for ($i=1; $i <= $args['count'] ; $i++) {  
         $obj = $modx->newObject($args['classname']);
-        $obj->fromArray($args);
+        $obj->fromArray($args); // <--- throw everything at the wall... only real properties should stick
         switch ($args['classname']) {
             case 'modResource':
                 // Set the things that need to be unique
@@ -70,7 +70,14 @@ function add_records($args) {
                 break;
         }
         if (!$obj->save()) {
-            print message("Failed to add a {$args['classname']} Record",'ERROR');
+            $summary = array();
+            $validator = $obj->getValidator();
+            if ($validator->hasMessages()) {
+                foreach ($validator->getMessages() as $message) {
+                    $summary[] = sprintf("\t- field: %s -- \"%s\"\n", $message['field'], $message['message']);
+                }
+            }
+            print message("Failed to add a {$args['classname']} Record\n".implode("\n",$summary),'ERROR');
         }
     }
 }
