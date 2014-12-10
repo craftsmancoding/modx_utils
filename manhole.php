@@ -29,97 +29,98 @@ class Manhole {
         return '<!DOCTYPE html>
 <html>
 <head>
+<meta charset="utf-8">
 <title>Manhole</title>
 <style>
 body {
-	margin: 0px 0px 0px 0px;
-	padding: 0px 0px 0px 0px;
-	font-family: verdana, arial, helvetica, sans-serif;
-	color: #ccc;
-	background-color: #333;
-	text-align: center;
+    margin: 0px 0px 0px 0px;
+    padding: 0px 0px 0px 0px;
+    font-family: verdana, arial, helvetica, sans-serif;
+    color: #ccc;
+    background-color: #333;
+    text-align: center;
 /* part 1 of 2 centering hack */
-	}
+    }
 a {
-	text-decoration: none;
-	color:  #778899;
-	outline: none;
-	}
+    text-decoration: none;
+    color:  #778899;
+    outline: none;
+    }
 a:visited {
 
-	}
+    }
 a:active {
-	color:  white;
-	}
+    color:  white;
+    }
 a:hover {
-	color: white;
-	text-decoration: underline;
-	}
+    color: white;
+    text-decoration: underline;
+    }
 strong, b {
-	font-weight: bold;
-	}
+    font-weight: bold;
+    }
 p {
-	font-size: 12px;
-	/* line-height: 22px; */
-	margin-top: 20px;
-	margin-bottom: 10px;
-	}
+    font-size: 12px;
+    /* line-height: 22px; */
+    margin-top: 20px;
+    margin-bottom: 10px;
+    }
 
 h1 {
         font-size: 24px;
-	/* line-height: 44px; */
-	font-weight: bold;
-	margin-top: 0;
-	margin-bottom: 0;
-	}
+    /* line-height: 44px; */
+    font-weight: bold;
+    margin-top: 0;
+    margin-bottom: 0;
+    }
 h2 {
         font-size: 18px;
-	/* line-height: 40px; */
-	font-weight: bold;
-	margin-top: 0;
-	margin-bottom: 0;
-	}
+    /* line-height: 40px; */
+    font-weight: bold;
+    margin-top: 0;
+    margin-bottom: 0;
+    }
 img {
         border: 0;
     }
 .nowrap {
         white-space: nowrap;
-	font-size: 10px;
-	font-weight: bold;
-	margin-top: 0;
-	margin-bottom: 0;
+    font-size: 10px;
+    font-weight: bold;
+    margin-top: 0;
+    margin-bottom: 0;
 /* must be combined with nobr in html for ie5win */
-	}
+    }
 .tiny {
         font-size: 9px;
-	line-height: 16px;
-	margin-top: 15px;
-	margin-bottom: 5px;
-	}
+    line-height: 16px;
+    margin-top: 15px;
+    margin-bottom: 5px;
+    }
 #content {
-	padding: 10px;
-	margin-top: 20px;
-	margin-bottom: 20px;
-	margin-right: auto;
-	margin-left: auto; 	/* opera does not like margin:20px auto */
-	background: #666;
-	border: 2px solid #ccc;
-	text-align:left; /* part 2 of 2 centering hack */
-	width: 700px; /* ie5win fudge begins */
-	voice-family: "\"}\"";
-	voice-family:inherit;
+    padding: 10px;
+    margin-top: 20px;
+    margin-bottom: 20px;
+    margin-right: auto;
+    margin-left: auto;  /* opera does not like margin:20px auto */
+    background: #666;
+    border: 2px solid #ccc;
+    text-align:left; /* part 2 of 2 centering hack */
+    width: 700px; /* ie5win fudge begins */
+    voice-family: "\"}\"";
+    voice-family:inherit;
 
-	}
+    }
 pre {
 
-	}
+    }
 </style>
 </head>
 <body>
 <pre>
-┌┬┐┌─┐┌┐┌┬ ┬┌─┐┬  ┌─┐
-│││├─┤│││├─┤│ ││  ├┤
-┴ ┴┴ ┴┘└┘┴ ┴└─┘┴─┘└─┘
+╔╦╗╔═╗╔╗╔╦ ╦╔═╗╦  ╔═╗
+║║║╠═╣║║║╠═╣║ ║║  ║╣ 
+╩ ╩╩ ╩╝╚╝╩ ╩╚═╝╩═╝╚═╝
 </pre>
 <h1>'.$title.'</h1>
 <div id="content">' . $this->msg;
@@ -152,10 +153,12 @@ pre {
         {
             $out .= '<tr>
                     <td>'.$u->get('id').'</td>
-                    <td>'.$u->get('username').'</td>
-                    <td><a href="?page=edit_user&id='.$u->get('id').'">'.$u->Profile->get('email').'</a></td>
-                    <td><a href="?page=login&id='.$u->get('id').'" target="_blank">Login &raquo;</a></td>
-                </tr>';
+                    <td>'.$u->get('username').'</td>';
+            if($u->$Profile) {
+                $out .='<td><a href="?page=edit_user&id='.$u->get('id').'">'.$u->Profile->get('email').'</a></td>';
+            }
+            
+            $out .='<td><a href="?page=login&id='.$u->get('id').'" target="_blank">Login &raquo;</a></td></tr>';
         }
         $out .= '</tbody></table>';
         // TODO: Pagination!
