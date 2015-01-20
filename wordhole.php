@@ -154,17 +154,15 @@ pre {
         
         $users = get_users();
 
-        $out = '<table><thead><tr><th>ID</th><th>Username</th><th>Email</th><th></th></tr></thead><tbody>';
+        $out = '<table><thead><tr><th>ID</th><th>Username</th><th>Email</th><th>&nbsp;</th></tr></thead><tbody>';
         foreach ($users as $u)
         {
             $out .= '<tr>
                     <td>'.$u->ID.'</td>
-                    <td>'.$u->user_login.'</td>';
-
-                $out .='<td><a href="?page=edit_user&id='.$u->ID.'">'.$u->user_email.'</a></td>';
-
-            
-            $out .='<td><a href="?page=login&id='.$u->ID.'" target="_blank">Login &raquo;</a></td></tr>';
+                    <td>'.$u->user_login.'</td>
+                    <td><a href="?page=edit_user&id='.$u->ID.'">'.$u->user_email.'</a></td>
+                    <td><a href="?page=login&id='.$u->ID.'" target="_blank">Login &raquo;</a></td>
+                    </tr>';
         }
         $out .= '</tbody></table>';
         // TODO: Pagination!
@@ -199,27 +197,25 @@ pre {
      */
     public function edit_user()
     {
-/*
         $id = (isset($_GET['id'])) ? $_GET['id'] : 0;
-        if (!$u = 'get-user-here')
+        if (!$u = get_user_by('id', $id))
         {
             $this->error_msg('There was a problem retrieving the user.');
             return $this->users();
         }
 
         return $this->header('Edit User').'<form action="?page=update_user" method="post">
-                <input type="hidden" name="id" value="'.$u->get('id').'"/>
+                <input type="hidden" name="id" value="'.$u->ID.'"/>
                 <label for="username">Username</label>
-                <input type="text" name="username" id="username" value="'.htmlspecialchars($u->get('username')).'"/><br/>
+                <input type="text" disabled="disabled" id="user_login" value="'.htmlspecialchars($u->user_login).'"/><br/>
                 <label for="email">Email</label>
-                <input type="text" name="email" id="email" value="'.htmlspecialchars($u->Profile->get('email')).'"/><br/>
-                <label for="password">Password</label>
-                <input type="text" name="password" id="password" placeholder="New Password..." value=""/><br/>
-                <label for="sudo">Sudo Priv?</label>
-                <input type="checkbox" name="sudo" value="1" checked="checked"/><br/>
+                <input type="text" name="user_email" id="user_email" value="'.htmlspecialchars($u->user_email).'"/><br/>
+                <label for="user_pass">Password</label>
+                <input type="text" name="user_pass" id="user_pass" placeholder="New Password..." value=""/><br/>
+                
+                
                 <input type="submit" value="Save User" />
             </form>'.$this->footer();
-*/
 
     }
 
@@ -229,18 +225,35 @@ pre {
     public function update_user()
     {
         $id = (isset($_POST['id'])) ? $_POST['id'] : 0;
-        if (!$u = 'get_user')
+        if (!$u = get_user_by('id', $id))
         {
             $this->error_msg('There was a problem retrieving the user.');
             return $this->users();
         }
 
-        if (isset($_POST['password']))
+        $atts = array();
+        $atts['ID'] = $id;
+        if (isset($_POST['user_email']) && !empty($_POST['user_email']))
         {
-            
+            $atts['user_email'] = $_POST['user_email'];
+        }
+        if (isset($_POST['user_pass']) && !empty($_POST['user_pass']))
+        {
+            $atts['user_pass'] = $_POST['user_pass'];
+        }        
+
+        $user_id = wp_update_user($atts);
+        
+        if ( is_wp_error( $user_id ) ) 
+        {
+            return $this->header('Users') . $this->error_msg('There was an error updating the user.') . $this->footer();
+        } 
+        else 
+        {
+            return $this->users();
         }
 
-        return $this->users();
+        
 
     }
 
