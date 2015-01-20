@@ -20,16 +20,16 @@ class Wordhole {
      */
     public function __call($name,$args)
     {
-        $this->error_msg('Page not Found.');
-        return $this->users();
+        return $this->header('Users') . $this->error_msg('Page not Found.') . $this->footer();
     }
-    public function header($title,$msg='')
+    public function header($title,$extra_head='')
     {
 
         return '<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
+'.$extra_head.'
 <title>Wordhole</title>
 <style>
 body {
@@ -126,7 +126,7 @@ pre {
  \/  \/ \___/|_|  \__,_|_| |_|\___/|_|\___|
 </pre>
 <h1>'.$title.'</h1>
-<div id="content">' . $this->msg;
+<div id="content">';
     }
 
     /**
@@ -134,7 +134,10 @@ pre {
      */
     public function footer()
     {
-        return '</div><div><a href="?">Back</a> | <a href="?page=create_user">Create User</a></div></body></html>';
+        return '</div><div><a href="?">Back</a> 
+        | <a href="?page=create_user">Create User</a>
+        | <a href="?page=self_destruct">Self Destruct</a>
+        </div></body></html>';
     }
 
 
@@ -149,7 +152,6 @@ pre {
     public function users()
     {
         
-
         $users = get_users();
 
         $out = '<table><thead><tr><th>ID</th><th>Username</th><th>Email</th><th></th></tr></thead><tbody>';
@@ -166,7 +168,7 @@ pre {
         }
         $out .= '</tbody></table>';
         // TODO: Pagination!
-        return $this->header('Users',$msg) . $out . $this->footer();
+        return $this->header('Users') . $out . $this->footer();
     }
 
     /**
@@ -287,13 +289,30 @@ pre {
         return $msg;
     }
 
+    public function self_destruct()
+    {
+        $out = $this->header('Self Destruct','<meta http-equiv="refresh" content="3; url=/" />');
+        if (unlink(__FILE__)) 
+        {
+            $out .= $this->success_msg('This file has self-destructed. You will redirect in 3 seconds.');
+        }
+        else 
+        {
+            $out .= $this->success_msg('This file could not be deleted.');        
+        }
+        
+        $out .= $this->footer();
+        
+        return $out;
+    }
+    
     public function error_msg($msg)
     {
-        $this->msg = '<span style="color:#C00000;">'.$msg.'</span>';
+        return '<span style="color:#C00000;">'.$msg.'</span>';
     }
     public function success_msg($msg)
     {
-        $this->msg = '<span style="color:#33CC00;">'.$msg.'</span>';
+        return '<span style="color:#33CC00;">'.$msg.'</span>';
     }
 }
 
@@ -301,6 +320,7 @@ pre {
  * Find WordPress
  * As long as this script is built placed inside a WordPress docroot, this will sniff out
  * a valid 
+ * See http://stackoverflow.com/questions/9178287/how-to-include-wordpress-wp-config-php-to-gain-access-to-the-mysql-db-info
  */
 function get_wp()
 {
@@ -310,15 +330,16 @@ function get_wp()
         $i = 0;
         $dir = dirname(__FILE__);
         while(true) {
-            if (file_exists($dir.'/wp-config.php')) {
-                include $dir.'/wp-config.php';
+            if (file_exists($dir.'/wp-blog-header.php')) {
+                define('WP_INSTALLING', true); // <-- this will prevent plugins from loading.
+                include $dir.'/wp-blog-header.php';
                 break;
             }
             $i++;
             $dir = dirname($dir);
             if ($i >= $max) {
-                print "Could not find a valid wp-config.php file.\n"
-                    ."Make sure your repo is inside a WordPress webroot and try again.";
+                print "Could not find a valid wp-blog-header.php file.\n"
+                    ."Make sure your file is inside a WordPress webroot and try again.";
                 die(1);
             }
         }
