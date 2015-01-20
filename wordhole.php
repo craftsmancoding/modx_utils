@@ -1,14 +1,14 @@
 <?php
 
-class Manhole {
-    public $modx;
+class Wordhole {
+//    public $modx;
 
     public $msg;
 
 
-    public function __construct($modx)
+    public function __construct()
     {
-        $this->modx = $modx;
+        //$this->modx = $modx;
     }
 
     /**
@@ -30,7 +30,7 @@ class Manhole {
 <html>
 <head>
 <meta charset="utf-8">
-<title>Manhole</title>
+<title>Wordhole</title>
 <style>
 body {
     margin: 0px 0px 0px 0px;
@@ -118,9 +118,12 @@ pre {
 </head>
 <body>
 <pre>
-╔╦╗╔═╗╔╗╔╦ ╦╔═╗╦  ╔═╗
-║║║╠═╣║║║╠═╣║ ║║  ║╣ 
-╩ ╩╩ ╩╝╚╝╩ ╩╚═╝╩═╝╚═╝
+ _    _               _ _           _      
+| |  | |             | | |         | |     
+| |  | | ___  _ __ __| | |__   ___ | | ___ 
+| |/\| |/ _ \| \'__/ _` | \'_ \ / _ \| |/ _ \
+\  /\  / (_) | | | (_| | | | | (_) | |  __/
+ \/  \/ \___/|_|  \__,_|_| |_|\___/|_|\___|
 </pre>
 <h1>'.$title.'</h1>
 <div id="content">' . $this->msg;
@@ -145,20 +148,21 @@ pre {
      */
     public function users()
     {
-        $criteria = $this->modx->newQuery('modUser', array());
-        $users = $this->modx->getCollectionGraph('modUser','{"Profile":{}}',$criteria);
+        
+
+        $users = get_users();
 
         $out = '<table><thead><tr><th>ID</th><th>Username</th><th>Email</th><th></th></tr></thead><tbody>';
         foreach ($users as $u)
         {
             $out .= '<tr>
-                    <td>'.$u->get('id').'</td>
-                    <td>'.$u->get('username').'</td>';
-            if($u->$Profile) {
-                $out .='<td><a href="?page=edit_user&id='.$u->get('id').'">'.$u->Profile->get('email').'</a></td>';
-            }
+                    <td>'.$u->ID.'</td>
+                    <td>'.$u->user_login.'</td>';
+
+                $out .='<td><a href="?page=edit_user&id='.$u->ID.'">'.$u->user_email.'</a></td>';
+
             
-            $out .='<td><a href="?page=login&id='.$u->get('id').'" target="_blank">Login &raquo;</a></td></tr>';
+            $out .='<td><a href="?page=login&id='.$u->ID.'" target="_blank">Login &raquo;</a></td></tr>';
         }
         $out .= '</tbody></table>';
         // TODO: Pagination!
@@ -172,13 +176,9 @@ pre {
     public function login()
     {
         $id = (isset($_GET['id'])) ? $_GET['id'] : 0;
-        if (!$u = $this->modx->getObject('modUser',$id))
-        {
-            return $this->error('There was a problem retrieving the user.');
-        }
-        $u->addSessionContext('mgr');
-        $_SESSION['modx.mgr.session.cookie.lifetime']= 0;
-        header( 'Location: '.MODX_MANAGER_URL   );
+        wp_set_auth_cookie($id);
+        wp_safe_redirect(admin_url());
+		exit();
         exit;
     }
 
@@ -188,22 +188,6 @@ pre {
     public function clear_user()
     {
         $id = (isset($_GET['id'])) ? $_GET['id'] : 0;
-        if (!$u = $this->modx->getObject('modUser',$id))
-        {
-            return $this->error('There was a problem retrieving the user.');
-        }
-
-        $u->set('active',true);
-        if ($P = $u->getOne('Profile'))
-        {
-            $P->set('blocked',0);
-            $P->set('blockeduntil',0);
-            $P->set('blockedafter',0);
-            $P->set('logincount',0);
-            $P->set('failedlogincount',0);
-        }
-        $P->save();
-        $u->save();
 
     }
 
@@ -213,8 +197,9 @@ pre {
      */
     public function edit_user()
     {
+/*
         $id = (isset($_GET['id'])) ? $_GET['id'] : 0;
-        if (!$u = $this->modx->getObject('modUser',$id))
+        if (!$u = 'get-user-here')
         {
             $this->error_msg('There was a problem retrieving the user.');
             return $this->users();
@@ -232,6 +217,7 @@ pre {
                 <input type="checkbox" name="sudo" value="1" checked="checked"/><br/>
                 <input type="submit" value="Save User" />
             </form>'.$this->footer();
+*/
 
     }
 
@@ -241,28 +227,16 @@ pre {
     public function update_user()
     {
         $id = (isset($_POST['id'])) ? $_POST['id'] : 0;
-        if (!$u = $this->modx->getObject('modUser',$id))
+        if (!$u = 'get_user')
         {
             $this->error_msg('There was a problem retrieving the user.');
             return $this->users();
         }
-        $sudo = (isset($_POST['sudo'])) ? true : false;
+
         if (isset($_POST['password']))
         {
-            $u->set('password', $_POST['password']);
+            
         }
-        $u->set('username', $_POST['username']);
-        $u->set('sudo', $sudo);
-        $u->Profile->set('email', $_POST['email']);
-        if ($u->save())
-        {
-            $this->success_msg('User updated.');
-        }
-        else
-        {
-            $this->error_msg('There was a problem updating the user.');
-        }
-
 
         return $this->users();
 
@@ -280,8 +254,6 @@ pre {
                 <input type="text" name="email" id="email" value=""/><br/>
                 <label for="password">Password</label>
                 <input type="text" name="password" id="password" placeholder="Password..." value=""/><br/>
-                <label for="sudo">Sudo Priv?</label>
-                <input type="checkbox" name="sudo" value="1" checked="checked"/><br/>
                 <input type="submit" value="Create User" />
             </form>'.$this->footer();
     }
@@ -291,27 +263,6 @@ pre {
      */
     public function insert_user()
     {
-        //return '<pre>'.print_r($_POST);
-        $u = $this->modx->newObject('modUser');
-        $p = $this->modx->newObject('modUserProfile');
-        $sudo = (isset($_POST['sudo'])) ? true : false;
-
-        $u->set('password', $_POST['password']);
-
-        $u->set('username', $_POST['username']);
-        $u->set('sudo', $sudo);
-
-        $p->set('email', $_POST['email']);
-        $u->addOne($p);
-        if ($u->save())
-        {
-            $this->success_msg('User created.');
-        }
-        else
-        {
-            $this->error_msg('There was a problem creating the user.');
-        }
-
 
         return $this->users();
 
@@ -347,57 +298,42 @@ pre {
 }
 
 /**
- * Find MODX...
- * As long as this script is built placed inside a MODX docroot, this will sniff out
- * a valid MODX_CORE_PATH.  This will effectively force the MODX_CONFIG_KEY too.
- * The config key controls which config file will be loaded.
- * Syntax: {$config_key}.inc.php
- * 99.9% of the time this will be "config", but it's useful when dealing with
- * dev/prod pushes to have a config.inc.php and a prod.inc.php, stg.inc.php etc.
+ * Find WordPress
+ * As long as this script is built placed inside a WordPress docroot, this will sniff out
+ * a valid 
  */
-function get_modx()
+function get_wp()
 {
     $dir = '';
-    if (!defined('MODX_CORE_PATH') && !defined('MODX_CONFIG_KEY')) {
+    if (!defined('DB_NAME')) {
         $max = 10;
         $i = 0;
         $dir = dirname(__FILE__);
         while(true) {
-            if (file_exists($dir.'/config.core.php')) {
-                include $dir.'/config.core.php';
+            if (file_exists($dir.'/wp-config.php')) {
+                include $dir.'/wp-config.php';
                 break;
             }
             $i++;
             $dir = dirname($dir);
             if ($i >= $max) {
-                print "Could not find a valid MODX config.core.php file.\n"
-                    ."Make sure your repo is inside a MODX webroot and try again.";
+                print "Could not find a valid wp-config.php file.\n"
+                    ."Make sure your repo is inside a WordPress webroot and try again.";
                 die(1);
             }
         }
     }
 
-    if (!file_exists(MODX_CORE_PATH.'model/modx/modx.class.php')) {
-        print message("modx.class.php not found at ".MODX_CORE_PATH,'ERROR');
-        die(3);
-    }
-
-
-    // fire up MODX
-    require_once MODX_CORE_PATH.'config/'.MODX_CONFIG_KEY.'.inc.php';
-    require_once MODX_CORE_PATH.'model/modx/modx.class.php';
-
-    return new modx();
 }
 
 //----------------------------------------------------------------------------------------------------------------------
 // MAIN
 //----------------------------------------------------------------------------------------------------------------------
 
-$modx = get_modx();
-$modx->initialize('mgr');
+$modx = get_wp();
 
-$P = new Manhole($modx);
+
+$P = new Wordhole();
 
 // Routing
 $page = (isset($_GET['page'])) ? $_GET['page'] : 'users';
