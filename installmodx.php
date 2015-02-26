@@ -1061,6 +1061,27 @@ print PHP_EOL. 'Extracting zip file.';
 // Extract the zip to a our temporary src dir
 // extract_zip needs the target to have a trailing slash!
 extract_zip($args['zip'],$src.DIRECTORY_SEPARATOR,false);
+
+//Check destinations are writeable
+print PHP_EOL. 'Checking all files are writeable.';
+$writefail=false;
+$di = new RecursiveDirectoryIterator($src);
+foreach (new RecursiveIteratorIterator($di) as $filename => $file) {
+	if(filetype($filename)=='dir') continue;
+	$oldfile=str_replace($src.'/',$target,$filename);
+	if  (file_exists($oldfile) && !is_writeable($oldfile)) {
+		if ($writefail==false) print PHP_EOL.'The following files are not writeable';
+		print PHP_EOL.$oldfile;
+    	$writefail=true;
+    }
+}
+if ($writefail==true) {
+	rrmdir($src); // lose the zip dir
+	print PHP_EOL.'Make these files writeable before continuing. Terminating...';
+	die ();
+}
+
+
 // Move into position 
 // (both src and dest. target dirs must NOT contain trailing slash)
 recursive_copy($src.'/connectors', $target.basename($data['connectors_path']));
