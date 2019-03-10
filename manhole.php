@@ -348,7 +348,7 @@ pre {
 
 /**
  * Find MODX...
- * As long as this script is built placed inside a MODX docroot, this will sniff out
+ * As long as this script is placed inside a MODX docroot, this will sniff out
  * a valid MODX_CORE_PATH.  This will effectively force the MODX_CONFIG_KEY too.
  * The config key controls which config file will be loaded.
  * Syntax: {$config_key}.inc.php

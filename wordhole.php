@@ -1,14 +1,19 @@
 <?php
-
+/*
+ * This is a script used to hack into WordPress sites where you have access to
+ * the file-system, but you do not have a valid manager login.
+ * Put this file into the root of a WordPress site and hit it in a browser.
+ *
+ * Last tested circa 2015... unsure if this works on more recent versions of WP.
+ */
 class Wordhole {
-//    public $modx;
 
     public $msg;
 
 
     public function __construct()
     {
-        //$this->modx = $modx;
+
     }
 
     /**

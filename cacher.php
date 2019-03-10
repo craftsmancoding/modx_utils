@@ -26,16 +26,17 @@ if (php_sapi_name() !== 'cli') die('CLI access only.');
 
 
 /**
- * Colorize text for cleaner CLI UX. 
+ * Colorize text for cleaner CLI UX.
  * TODO: Windows compatible?
  *
- * Adapted from 
+ * Adapted from
  * http://softkube.com/blog/generating-command-line-colors-with-php/
  * http://www.if-not-true-then-false.com/2010/php-class-for-coloring-php-command-line-cli-scripts-output-php-output-colorizing-using-bash-shell-colors/
- * 
+ *
  * @param string $text
  * @param string $status
  * @return string message formatted for CLI
+ * @throws Exception
  */
 function message($text, $status) {
     $out = '';
